@@ -7,6 +7,7 @@ naming, wildcard support, and specificity comparison.
 from .tagged_urn import (
     TaggedUrn,
     TaggedUrnBuilder,
+    UrnMatcher,
     TaggedUrnError,
     EmptyError,
     MissingPrefixError,
@@ -18,6 +19,8 @@ from .tagged_urn import (
     DuplicateKeyError,
     WhitespaceInInputError,
     PrefixMismatchError,
+    NumericKeyError,
+    InvalidTagFormatError,
 )
 
 __version__ = "0.14.3800"
@@ -25,6 +28,7 @@ __version__ = "0.14.3800"
 __all__ = [
     "TaggedUrn",
     "TaggedUrnBuilder",
+    "UrnMatcher",
     "TaggedUrnError",
     "EmptyError",
     "MissingPrefixError",
@@ -36,4 +40,6 @@ __all__ = [
     "DuplicateKeyError",
     "WhitespaceInInputError",
     "PrefixMismatchError",
+    "NumericKeyError",
+    "InvalidTagFormatError",
 ]

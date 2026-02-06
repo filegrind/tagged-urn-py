@@ -46,11 +46,11 @@ from tagged_urn import TaggedUrn, TaggedUrnBuilder
 # Parse from string
 urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
 
-# Build programmatically
-urn = TaggedUrnBuilder("cap") \
-    .tag("op", "generate") \
-    .tag("ext", "pdf") \
-    .build()
+# Build programmatically (fluent interface)
+urn = (TaggedUrnBuilder("cap")
+       .tag("op", "generate")
+       .tag("ext", "pdf")
+       .build())
 
 # Check if URN matches a pattern
 pattern = TaggedUrn.from_string("cap:op=*;ext=pdf")
