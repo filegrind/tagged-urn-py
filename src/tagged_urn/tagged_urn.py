@@ -304,17 +304,11 @@ class TaggedUrn:
         result += '"'
         return result
 
-    def to_string(self) -> str:
-        """Get the canonical string representation of this tagged URN
+    def tags_to_string(self) -> str:
+        """Serialize just the tags portion (without prefix)
 
-        Uses the stored prefix
-        Tags are already sorted alphabetically due to dict ordering
-        No trailing semicolon in canonical form
-        Values are quoted only when necessary (smart quoting)
-        Special value serialization:
-        - `*` (must-have-any): serialized as value-less tag (just the key)
-        - `?` (unspecified): serialized as key=?
-        - `!` (must-not-have): serialized as key=!
+        Returns the tags in canonical form with proper quoting and sorting.
+        This is the portion after the ":" in a full URN string.
         """
         # Sort keys for canonical form
         sorted_tags = sorted(self.tags.items())
@@ -335,7 +329,21 @@ class TaggedUrn:
             else:
                 tags_str_list.append(f"{k}={v}")
 
-        tags_str = ";".join(tags_str_list)
+        return ";".join(tags_str_list)
+
+    def to_string(self) -> str:
+        """Get the canonical string representation of this tagged URN
+
+        Uses the stored prefix
+        Tags are already sorted alphabetically due to dict ordering
+        No trailing semicolon in canonical form
+        Values are quoted only when necessary (smart quoting)
+        Special value serialization:
+        - `*` (must-have-any): serialized as value-less tag (just the key)
+        - `?` (unspecified): serialized as key=?
+        - `!` (must-not-have): serialized as key=!
+        """
+        tags_str = self.tags_to_string()
         return f"{self.prefix}:{tags_str}"
 
     def __str__(self) -> str:
