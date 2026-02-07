@@ -34,7 +34,7 @@ def test_prefix_mismatch_error():
     urn2 = TaggedUrn.from_string("myapp:op=test")
 
     with pytest.raises(TaggedUrnError) as exc_info:
-        urn1.matches(urn2)
+        urn1.conforms_to(urn2)
     assert exc_info.value.expected == "cap"
     assert exc_info.value.actual == "myapp"
 
@@ -211,8 +211,8 @@ def test_trailing_semicolon_equivalence():
     assert str(urn1) == str(urn2)
 
     # They should match each other
-    assert urn1.matches(urn2)
-    assert urn2.matches(urn1)
+    assert urn1.conforms_to(urn2)
+    assert urn2.conforms_to(urn1)
 
 
 def test_canonical_string_format():
@@ -227,31 +227,31 @@ def test_tag_matching():
 
     # Exact match
     request1 = TaggedUrn.from_string("cap:op=generate;ext=pdf;target=thumbnail;")
-    assert urn.matches(request1)
+    assert urn.conforms_to(request1)
 
     # Subset match
     request2 = TaggedUrn.from_string("cap:op=generate")
-    assert urn.matches(request2)
+    assert urn.conforms_to(request2)
 
     # Wildcard request should match specific URN
     request3 = TaggedUrn.from_string("cap:ext=*")
-    assert urn.matches(request3)  # URN has ext=pdf, request accepts any ext
+    assert urn.conforms_to(request3)  # URN has ext=pdf, request accepts any ext
 
     # No match - conflicting value
     request4 = TaggedUrn.from_string("cap:op=extract")
-    assert not urn.matches(request4)
+    assert not urn.conforms_to(request4)
 
 
 def test_matching_case_sensitive_values():
     # Values with different case should NOT match
     urn1 = TaggedUrn.from_string(r'cap:key="Value"')
     urn2 = TaggedUrn.from_string(r'cap:key="value"')
-    assert not urn1.matches(urn2)
-    assert not urn2.matches(urn1)
+    assert not urn1.conforms_to(urn2)
+    assert not urn2.conforms_to(urn1)
 
     # Same case should match
     urn3 = TaggedUrn.from_string(r'cap:key="Value"')
-    assert urn1.matches(urn3)
+    assert urn1.conforms_to(urn3)
 
 
 def test_missing_tag_handling():
@@ -263,21 +263,21 @@ def test_missing_tag_handling():
     # Pattern with tag that instance doesn't have: NO MATCH
     # Pattern ext=pdf requires instance to have ext=pdf, but instance doesn't have ext
     pattern1 = TaggedUrn.from_string("cap:ext=pdf")
-    assert not urn.matches(pattern1)  # Instance missing ext, pattern wants ext=pdf
+    assert not urn.conforms_to(pattern1)  # Instance missing ext, pattern wants ext=pdf
 
     # Pattern missing tag = no constraint: MATCH
     # Instance has op=generate, pattern has no constraint on op
     urn2 = TaggedUrn.from_string("cap:op=generate;ext=pdf")
     pattern2 = TaggedUrn.from_string("cap:op=generate")
-    assert urn2.matches(pattern2)  # Instance has ext=pdf, pattern doesn't constrain ext
+    assert urn2.conforms_to(pattern2)  # Instance has ext=pdf, pattern doesn't constrain ext
 
     # To match any value of a tag, use explicit ? or *
     pattern3 = TaggedUrn.from_string("cap:ext=?")  # ? = no constraint
-    assert urn.matches(pattern3)  # Instance missing ext, pattern doesn't care
+    assert urn.conforms_to(pattern3)  # Instance missing ext, pattern doesn't care
 
     # * means must-have-any - instance must have the tag
     pattern4 = TaggedUrn.from_string("cap:ext=*")
-    assert not urn.matches(pattern4)  # Instance missing ext, pattern requires ext to be present
+    assert not urn.conforms_to(pattern4)  # Instance missing ext, pattern requires ext to be present
 
 
 def test_specificity():
@@ -387,8 +387,8 @@ def test_wildcard_tag():
 
     # Test that wildcarded URN can match more requests
     request = TaggedUrn.from_string("cap:ext=jpg")
-    assert not urn.matches(request)
-    assert wildcarded.matches(TaggedUrn.from_string("cap:ext"))
+    assert not urn.conforms_to(request)
+    assert wildcarded.conforms_to(TaggedUrn.from_string("cap:ext"))
 
 
 def test_empty_tagged_urn():
@@ -405,14 +405,14 @@ def test_empty_tagged_urn():
 
     # Empty instance vs specific pattern: NO MATCH
     # Pattern requires op=generate and ext=pdf, instance doesn't have them
-    assert not empty_urn.matches(specific_urn)
+    assert not empty_urn.conforms_to(specific_urn)
 
     # Specific instance vs empty pattern: MATCH
     # Pattern has no constraints, instance can have anything
-    assert specific_urn.matches(empty_urn)
+    assert specific_urn.conforms_to(empty_urn)
 
     # Empty instance vs empty pattern: MATCH
-    assert empty_urn.matches(empty_urn)
+    assert empty_urn.conforms_to(empty_urn)
 
     # With trailing semicolon
     empty_urn2 = TaggedUrn.from_string("cap:;")
@@ -524,7 +524,7 @@ def test_matching_semantics_test1_exact_match():
     # Result:  MATCH
     urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
     request = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    assert urn.matches(request), "Test 1: Exact match should succeed"
+    assert urn.conforms_to(request), "Test 1: Exact match should succeed"
 
 
 def test_matching_semantics_test2_instance_missing_tag():
@@ -537,11 +537,11 @@ def test_matching_semantics_test2_instance_missing_tag():
     # Pattern K=v requires instance to have K=v.
     instance = TaggedUrn.from_string("cap:op=generate")
     pattern = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    assert not instance.matches(pattern), "Test 2: Instance missing tag should NOT match when pattern requires it"
+    assert not instance.conforms_to(pattern), "Test 2: Instance missing tag should NOT match when pattern requires it"
 
     # To accept any ext (or missing), use pattern with ext=?
     pattern_optional = TaggedUrn.from_string("cap:op=generate;ext=?")
-    assert instance.matches(pattern_optional), "Pattern with ext=? should match instance without ext"
+    assert instance.conforms_to(pattern_optional), "Pattern with ext=? should match instance without ext"
 
 
 def test_matching_semantics_test3_urn_has_extra_tag():
@@ -551,7 +551,7 @@ def test_matching_semantics_test3_urn_has_extra_tag():
     # Result:  MATCH (request doesn't constrain version)
     urn = TaggedUrn.from_string("cap:op=generate;ext=pdf;version=2")
     request = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    assert urn.matches(request), "Test 3: URN with extra tag should match"
+    assert urn.conforms_to(request), "Test 3: URN with extra tag should match"
 
 
 def test_matching_semantics_test4_request_has_wildcard():
@@ -561,7 +561,7 @@ def test_matching_semantics_test4_request_has_wildcard():
     # Result:  MATCH (request accepts any ext)
     urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
     request = TaggedUrn.from_string("cap:op=generate;ext=*")
-    assert urn.matches(request), "Test 4: Request wildcard should match"
+    assert urn.conforms_to(request), "Test 4: Request wildcard should match"
 
 
 def test_matching_semantics_test5_urn_has_wildcard():
@@ -571,7 +571,7 @@ def test_matching_semantics_test5_urn_has_wildcard():
     # Result:  MATCH (URN handles any ext)
     urn = TaggedUrn.from_string("cap:op=generate;ext=*")
     request = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    assert urn.matches(request), "Test 5: URN wildcard should match"
+    assert urn.conforms_to(request), "Test 5: URN wildcard should match"
 
 
 def test_matching_semantics_test6_value_mismatch():
@@ -581,7 +581,7 @@ def test_matching_semantics_test6_value_mismatch():
     # Result:  NO MATCH
     urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
     request = TaggedUrn.from_string("cap:op=generate;ext=docx")
-    assert not urn.matches(request), "Test 6: Value mismatch should not match"
+    assert not urn.conforms_to(request), "Test 6: Value mismatch should not match"
 
 
 def test_matching_semantics_test7_pattern_has_extra_tag():
@@ -593,11 +593,11 @@ def test_matching_semantics_test7_pattern_has_extra_tag():
     # NEW SEMANTICS: Pattern K=v requires instance to have K=v
     instance = TaggedUrn.from_string(r'cap:op=generate_thumbnail;out="media:binary"')
     pattern = TaggedUrn.from_string(r'cap:op=generate_thumbnail;out="media:binary";ext=wav')
-    assert not instance.matches(pattern), "Test 7: Instance missing ext should NOT match when pattern requires ext=wav"
+    assert not instance.conforms_to(pattern), "Test 7: Instance missing ext should NOT match when pattern requires ext=wav"
 
     # Instance vs pattern that doesn't constrain ext: MATCH
     pattern_no_ext = TaggedUrn.from_string(r'cap:op=generate_thumbnail;out="media:binary"')
-    assert instance.matches(pattern_no_ext)
+    assert instance.conforms_to(pattern_no_ext)
 
 
 def test_matching_semantics_test8_empty_pattern_matches_anything():
@@ -610,12 +610,12 @@ def test_matching_semantics_test8_empty_pattern_matches_anything():
     # But empty instance only matches patterns that don't require tags
     instance = TaggedUrn.from_string("cap:op=generate;ext=pdf")
     empty_pattern = TaggedUrn.from_string("cap:")
-    assert instance.matches(empty_pattern), "Test 8: Any instance should match empty pattern"
+    assert instance.conforms_to(empty_pattern), "Test 8: Any instance should match empty pattern"
 
     # Empty instance vs pattern with requirements: NO MATCH
     empty_instance = TaggedUrn.from_string("cap:")
     pattern = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    assert not empty_instance.matches(pattern), "Empty instance should NOT match pattern with requirements"
+    assert not empty_instance.conforms_to(pattern), "Empty instance should NOT match pattern with requirements"
 
 
 def test_matching_semantics_test9_cross_dimension_constraints():
@@ -627,12 +627,12 @@ def test_matching_semantics_test9_cross_dimension_constraints():
     # NEW SEMANTICS: Pattern K=v requires instance to have K=v
     instance = TaggedUrn.from_string("cap:op=generate")
     pattern = TaggedUrn.from_string("cap:ext=pdf")
-    assert not instance.matches(pattern), "Test 9: Instance without ext should NOT match pattern requiring ext"
+    assert not instance.conforms_to(pattern), "Test 9: Instance without ext should NOT match pattern requiring ext"
 
     # Instance with ext vs pattern with different tag only: MATCH
     instance2 = TaggedUrn.from_string("cap:op=generate;ext=pdf")
     pattern2 = TaggedUrn.from_string("cap:ext=pdf")
-    assert instance2.matches(pattern2), "Instance with ext=pdf should match pattern requiring ext=pdf"
+    assert instance2.conforms_to(pattern2), "Instance with ext=pdf should match pattern requiring ext=pdf"
 
 
 def test_matching_different_prefixes_error():
@@ -641,7 +641,7 @@ def test_matching_different_prefixes_error():
     urn2 = TaggedUrn.from_string("other:op=test")
 
     with pytest.raises(TaggedUrnError):
-        urn1.matches(urn2)
+        urn1.conforms_to(urn2)
 
     with pytest.raises(TaggedUrnError):
         urn1.is_compatible_with(urn2)
@@ -710,9 +710,9 @@ def test_valueless_tag_matching():
     request_docx = TaggedUrn.from_string("cap:op=generate;ext=docx")
     request_any = TaggedUrn.from_string("cap:op=generate;ext=anything")
 
-    assert urn.matches(request_pdf)
-    assert urn.matches(request_docx)
-    assert urn.matches(request_any)
+    assert urn.conforms_to(request_pdf)
+    assert urn.conforms_to(request_docx)
+    assert urn.conforms_to(request_any)
 
 
 def test_valueless_tag_in_pattern():
@@ -724,13 +724,13 @@ def test_valueless_tag_in_pattern():
     instance_missing = TaggedUrn.from_string("cap:op=generate")
 
     # NEW SEMANTICS: K=* (valueless tag) means must-have-any
-    assert instance_pdf.matches(pattern)  # Has ext=pdf
-    assert instance_docx.matches(pattern)  # Has ext=docx
-    assert not instance_missing.matches(pattern)  # Missing ext, pattern requires it
+    assert instance_pdf.conforms_to(pattern)  # Has ext=pdf
+    assert instance_docx.conforms_to(pattern)  # Has ext=docx
+    assert not instance_missing.conforms_to(pattern)  # Missing ext, pattern requires it
 
     # To accept missing ext, use ? instead
     pattern_optional = TaggedUrn.from_string("cap:op=generate;ext=?")
-    assert instance_missing.matches(pattern_optional)
+    assert instance_missing.conforms_to(pattern_optional)
 
 
 def test_valueless_tag_specificity():
@@ -846,11 +846,11 @@ def test_question_mark_pattern_matches_anything():
     instance_wildcard = TaggedUrn.from_string("cap:ext=*")
     instance_must_not = TaggedUrn.from_string("cap:ext=!")
 
-    assert instance_pdf.matches(pattern), "ext=pdf should match ext=?"
-    assert instance_docx.matches(pattern), "ext=docx should match ext=?"
-    assert instance_missing.matches(pattern), "(no ext) should match ext=?"
-    assert instance_wildcard.matches(pattern), "ext=* should match ext=?"
-    assert instance_must_not.matches(pattern), "ext=! should match ext=?"
+    assert instance_pdf.conforms_to(pattern), "ext=pdf should match ext=?"
+    assert instance_docx.conforms_to(pattern), "ext=docx should match ext=?"
+    assert instance_missing.conforms_to(pattern), "(no ext) should match ext=?"
+    assert instance_wildcard.conforms_to(pattern), "ext=* should match ext=?"
+    assert instance_must_not.conforms_to(pattern), "ext=! should match ext=?"
 
 
 def test_question_mark_in_instance():
@@ -863,11 +863,11 @@ def test_question_mark_in_instance():
     pattern_question = TaggedUrn.from_string("cap:ext=?")
     pattern_missing = TaggedUrn.from_string("cap:")
 
-    assert instance.matches(pattern_pdf), "ext=? should match ext=pdf"
-    assert instance.matches(pattern_wildcard), "ext=? should match ext=*"
-    assert instance.matches(pattern_must_not), "ext=? should match ext=!"
-    assert instance.matches(pattern_question), "ext=? should match ext=?"
-    assert instance.matches(pattern_missing), "ext=? should match (no ext)"
+    assert instance.conforms_to(pattern_pdf), "ext=? should match ext=pdf"
+    assert instance.conforms_to(pattern_wildcard), "ext=? should match ext=*"
+    assert instance.conforms_to(pattern_must_not), "ext=? should match ext=!"
+    assert instance.conforms_to(pattern_question), "ext=? should match ext=?"
+    assert instance.conforms_to(pattern_missing), "ext=? should match (no ext)"
 
 
 def test_must_not_have_pattern_requires_absent():
@@ -879,10 +879,10 @@ def test_must_not_have_pattern_requires_absent():
     instance_wildcard = TaggedUrn.from_string("cap:ext=*")
     instance_must_not = TaggedUrn.from_string("cap:ext=!")
 
-    assert instance_missing.matches(pattern), "(no ext) should match ext=!"
-    assert not instance_pdf.matches(pattern), "ext=pdf should NOT match ext=!"
-    assert not instance_wildcard.matches(pattern), "ext=* should NOT match ext=!"
-    assert instance_must_not.matches(pattern), "ext=! should match ext=!"
+    assert instance_missing.conforms_to(pattern), "(no ext) should match ext=!"
+    assert not instance_pdf.conforms_to(pattern), "ext=pdf should NOT match ext=!"
+    assert not instance_wildcard.conforms_to(pattern), "ext=* should NOT match ext=!"
+    assert instance_must_not.conforms_to(pattern), "ext=! should match ext=!"
 
 
 def test_must_not_have_in_instance():
@@ -895,11 +895,11 @@ def test_must_not_have_in_instance():
     pattern_question = TaggedUrn.from_string("cap:ext=?")
     pattern_missing = TaggedUrn.from_string("cap:")
 
-    assert not instance.matches(pattern_pdf), "ext=! should NOT match ext=pdf"
-    assert not instance.matches(pattern_wildcard), "ext=! should NOT match ext=*"
-    assert instance.matches(pattern_must_not), "ext=! should match ext=!"
-    assert instance.matches(pattern_question), "ext=! should match ext=?"
-    assert instance.matches(pattern_missing), "ext=! should match (no ext)"
+    assert not instance.conforms_to(pattern_pdf), "ext=! should NOT match ext=pdf"
+    assert not instance.conforms_to(pattern_wildcard), "ext=! should NOT match ext=*"
+    assert instance.conforms_to(pattern_must_not), "ext=! should match ext=!"
+    assert instance.conforms_to(pattern_question), "ext=! should match ext=?"
+    assert instance.conforms_to(pattern_missing), "ext=! should match (no ext)"
 
 
 def test_full_cross_product_matching():
@@ -910,7 +910,7 @@ def test_full_cross_product_matching():
     def check(instance, pattern, expected, msg):
         inst = TaggedUrn.from_string(instance)
         patt = TaggedUrn.from_string(pattern)
-        assert inst.matches(patt) == expected, f"{msg}: instance={instance}, pattern={pattern}"
+        assert inst.conforms_to(patt) == expected, f"{msg}: instance={instance}, pattern={pattern}"
 
     # Instance missing, Pattern variations
     check("cap:", "cap:", True, "(none)/(none)")
@@ -955,19 +955,19 @@ def test_mixed_special_values():
 
     # Instance that satisfies all constraints
     good_instance = TaggedUrn.from_string("cap:required=yes;optional=maybe;exact=pdf")
-    assert good_instance.matches(pattern)
+    assert good_instance.conforms_to(pattern)
 
     # Instance missing required tag
     missing_required = TaggedUrn.from_string("cap:optional=maybe;exact=pdf")
-    assert not missing_required.matches(pattern)
+    assert not missing_required.conforms_to(pattern)
 
     # Instance has forbidden tag
     has_forbidden = TaggedUrn.from_string("cap:required=yes;forbidden=oops;exact=pdf")
-    assert not has_forbidden.matches(pattern)
+    assert not has_forbidden.conforms_to(pattern)
 
     # Instance with wrong exact value
     wrong_exact = TaggedUrn.from_string("cap:required=yes;exact=doc")
-    assert not wrong_exact.matches(pattern)
+    assert not wrong_exact.conforms_to(pattern)
 
 
 def test_serialization_round_trip_special_values():

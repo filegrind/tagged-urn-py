@@ -54,7 +54,7 @@ urn = (TaggedUrnBuilder("cap")
 
 # Check if URN matches a pattern
 pattern = TaggedUrn.from_string("cap:op=*;ext=pdf")
-assert urn.matches(pattern)
+assert urn.conforms_to(pattern)
 
 # Get specificity score
 score = urn.specificity()

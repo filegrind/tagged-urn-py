@@ -398,35 +398,40 @@ class TaggedUrn:
         new_tags.pop(key.lower(), None)
         return TaggedUrn(self.prefix, new_tags)
 
-    def matches(self, pattern: 'TaggedUrn') -> bool:
-        """Check if this URN (instance) matches a pattern based on tag compatibility
+    def conforms_to(self, pattern: 'TaggedUrn') -> bool:
+        """Check if this URN (instance) satisfies the pattern's constraints.
+
+        Equivalent to pattern.accepts(self).
 
         IMPORTANT: Both URNs must have the same prefix. Comparing URNs with
         different prefixes is a programming error and will raise an error.
-
-        Per-tag matching semantics:
-        | Pattern Form | Interpretation              | Instance Missing | Instance = v | Instance = x≠v |
-        |--------------|-----------------------------|--------------------|--------------|----------------|
-        | (no entry)   | no constraint               | OK match           | OK match     | OK match       |
-        | `K=?`        | no constraint (explicit)    | OK                 | OK           | OK             |
-        | `K=!`        | **must-not-have**           | OK                 | NO           | NO             |
-        | `K=*`        | **must-have, any value**    | NO                 | OK           | OK             |
-        | `K=v`        | **must-have, exact value**  | NO                 | OK           | NO             |
-
-        Special values work symmetrically on both instance and pattern sides.
         """
-        # First check prefix - must match exactly
-        if self.prefix != pattern.prefix:
-            raise PrefixMismatchError(self.prefix, pattern.prefix)
+        return self._check_match(self.tags, self.prefix, pattern.tags, pattern.prefix)
 
-        # Collect all keys from both instance and pattern
-        all_keys: Set[str] = set(self.tags.keys()) | set(pattern.tags.keys())
+    def accepts(self, instance: 'TaggedUrn') -> bool:
+        """Check if this URN (pattern) accepts the given instance.
+
+        Equivalent to instance.conforms_to(self).
+
+        IMPORTANT: Both URNs must have the same prefix. Comparing URNs with
+        different prefixes is a programming error and will raise an error.
+        """
+        return self._check_match(instance.tags, instance.prefix, self.tags, self.prefix)
+
+    @staticmethod
+    def _check_match(instance_tags: dict, instance_prefix: str,
+                     pattern_tags: dict, pattern_prefix: str) -> bool:
+        """Core matching: does instance satisfy pattern's constraints?"""
+        if instance_prefix != pattern_prefix:
+            raise PrefixMismatchError(instance_prefix, pattern_prefix)
+
+        all_keys: Set[str] = set(instance_tags.keys()) | set(pattern_tags.keys())
 
         for key in all_keys:
-            inst = self.tags.get(key)
-            patt = pattern.tags.get(key)
+            inst = instance_tags.get(key)
+            patt = pattern_tags.get(key)
 
-            if not self._values_match(inst, patt):
+            if not TaggedUrn._values_match(inst, patt):
                 return False
 
         return True
@@ -500,18 +505,15 @@ class TaggedUrn:
         else:
             return inst == patt  # Both have values, must match exactly
 
-    def matches_str(self, request_str: str) -> bool:
-        """Check if this URN matches a string-specified pattern"""
-        request = TaggedUrn.from_string(request_str)
-        return self.matches(request)
+    def conforms_to_str(self, pattern_str: str) -> bool:
+        """Check if this URN (instance) satisfies a string pattern's constraints."""
+        pattern = TaggedUrn.from_string(pattern_str)
+        return self.conforms_to(pattern)
 
-    def can_handle(self, request: 'TaggedUrn') -> bool:
-        """Check if this URN can handle a request
-
-        This is used when a request comes in with a tagged URN
-        and we need to see if this URN can fulfill it
-        """
-        return self.matches(request)
+    def accepts_str(self, instance_str: str) -> bool:
+        """Check if this URN (pattern) accepts a string instance."""
+        instance = TaggedUrn.from_string(instance_str)
+        return self.accepts(instance)
 
     def specificity(self) -> int:
         """Calculate specificity score for URN matching
@@ -682,15 +684,15 @@ class UrnMatcher:
 
     @staticmethod
     def find_best_match(urns: List[TaggedUrn], request: TaggedUrn) -> Optional[TaggedUrn]:
-        """Find the most specific URN that can handle a request
+        """Find the most specific URN that conforms to a request's constraints.
 
-        All URNs must have the same prefix as the request
+        URNs are instances (capabilities), request is the pattern (requirement).
         """
         best: Optional[TaggedUrn] = None
         best_specificity = 0
 
         for urn in urns:
-            if urn.can_handle(request):
+            if urn.conforms_to(request):
                 specificity = urn.specificity()
                 if best is None or specificity > best_specificity:
                     best = urn
@@ -700,19 +702,19 @@ class UrnMatcher:
 
     @staticmethod
     def find_all_matches(urns: List[TaggedUrn], request: TaggedUrn) -> List[TaggedUrn]:
-        """Find all URNs that can handle a request, sorted by specificity
+        """Find all URNs that conform to a request's constraints, sorted by specificity.
 
-        All URNs must have the same prefix as the request
+        URNs are instances (capabilities), request is the pattern (requirement).
         """
-        matches: List[TaggedUrn] = []
+        results: List[TaggedUrn] = []
 
         for urn in urns:
-            if urn.can_handle(request):
-                matches.append(urn)
+            if urn.conforms_to(request):
+                results.append(urn)
 
         # Sort by specificity (most specific first)
-        matches.sort(key=lambda urn: urn.specificity(), reverse=True)
-        return matches
+        results.sort(key=lambda urn: urn.specificity(), reverse=True)
+        return results
 
     @staticmethod
     def are_compatible(urns1: List[TaggedUrn], urns2: List[TaggedUrn]) -> bool:
