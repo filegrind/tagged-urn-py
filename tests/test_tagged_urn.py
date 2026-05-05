@@ -3,7 +3,7 @@ from tagged_urn import TaggedUrn, TaggedUrnBuilder, UrnMatcher, TaggedUrnError
 
 
 def test_tagged_urn_creation():
-    urn = TaggedUrn.from_string("cap:op=generate;ext=pdf;target=thumbnail;")
+    urn = TaggedUrn.from_string("cap:generate;ext=pdf;target=thumbnail;")
     assert urn.get_prefix() == "cap"
     assert urn.get_tag("op") == "generate"
     assert urn.get_tag("target") == "thumbnail"
@@ -11,16 +11,16 @@ def test_tagged_urn_creation():
 
 
 def test_custom_prefix():
-    urn = TaggedUrn.from_string("myapp:op=generate;ext=pdf")
+    urn = TaggedUrn.from_string("myapp:generate;ext=pdf")
     assert urn.get_prefix() == "myapp"
     assert urn.get_tag("op") == "generate"
-    assert str(urn) == "myapp:ext=pdf;op=generate"
+    assert str(urn) == "myapp:ext=pdf;generate"
 
 
 def test_prefix_case_insensitive():
-    urn1 = TaggedUrn.from_string("CAP:op=test")
-    urn2 = TaggedUrn.from_string("cap:op=test")
-    urn3 = TaggedUrn.from_string("Cap:op=test")
+    urn1 = TaggedUrn.from_string("CAP:test")
+    urn2 = TaggedUrn.from_string("cap:test")
+    urn3 = TaggedUrn.from_string("Cap:test")
 
     assert urn1.get_prefix() == "cap"
     assert urn2.get_prefix() == "cap"
@@ -30,8 +30,8 @@ def test_prefix_case_insensitive():
 
 
 def test_prefix_mismatch_error():
-    urn1 = TaggedUrn.from_string("cap:op=test")
-    urn2 = TaggedUrn.from_string("myapp:op=test")
+    urn1 = TaggedUrn.from_string("cap:test")
+    urn2 = TaggedUrn.from_string("myapp:test")
 
     with pytest.raises(TaggedUrnError) as exc_info:
         urn1.conforms_to(urn2)
@@ -60,7 +60,7 @@ def test_unquoted_values_lowercased():
     assert urn.get_tag("Op") == "generate"
 
     # Both URNs parse to same lowercase values (same tags, same values)
-    urn2 = TaggedUrn.from_string("cap:op=generate;ext=pdf;target=thumbnail;")
+    urn2 = TaggedUrn.from_string("cap:generate;ext=pdf;target=thumbnail;")
     assert str(urn) == str(urn2)
     assert urn == urn2
 
@@ -157,7 +157,7 @@ def test_serialization_smart_quoting():
 
 
 def test_round_trip_simple():
-    original = "cap:op=generate;ext=pdf"
+    original = "cap:generate;ext=pdf"
     urn = TaggedUrn.from_string(original)
     serialized = str(urn)
     reparsed = TaggedUrn.from_string(serialized)
@@ -185,21 +185,21 @@ def test_round_trip_escapes():
 def test_prefix_required():
     # Missing prefix should fail
     with pytest.raises(TaggedUrnError):
-        TaggedUrn.from_string("op=generate;ext=pdf")
+        TaggedUrn.from_string("generate;ext=pdf")
 
     # Valid prefix should work
-    urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    urn = TaggedUrn.from_string("cap:generate;ext=pdf")
     assert urn.get_tag("op") == "generate"
 
     # Case-insensitive prefix
-    urn2 = TaggedUrn.from_string("CAP:op=generate")
+    urn2 = TaggedUrn.from_string("CAP:generate")
     assert urn2.get_tag("op") == "generate"
 
 
 def test_trailing_semicolon_equivalence():
     # Both with and without trailing semicolon should be equivalent
-    urn1 = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    urn2 = TaggedUrn.from_string("cap:op=generate;ext=pdf;")
+    urn1 = TaggedUrn.from_string("cap:generate;ext=pdf")
+    urn2 = TaggedUrn.from_string("cap:generate;ext=pdf;")
 
     # They should be equal
     assert urn1 == urn2
@@ -216,21 +216,21 @@ def test_trailing_semicolon_equivalence():
 
 
 def test_canonical_string_format():
-    urn = TaggedUrn.from_string("cap:op=generate;target=thumbnail;ext=pdf")
+    urn = TaggedUrn.from_string("cap:generate;target=thumbnail;ext=pdf")
     # Should be sorted alphabetically and have no trailing semicolon in canonical form
     # Alphabetical order: ext < op < target
-    assert str(urn) == "cap:ext=pdf;op=generate;target=thumbnail"
+    assert str(urn) == "cap:ext=pdf;generate;target=thumbnail"
 
 
 def test_tag_matching():
-    urn = TaggedUrn.from_string("cap:op=generate;ext=pdf;target=thumbnail;")
+    urn = TaggedUrn.from_string("cap:generate;ext=pdf;target=thumbnail;")
 
     # Exact match
-    request1 = TaggedUrn.from_string("cap:op=generate;ext=pdf;target=thumbnail;")
+    request1 = TaggedUrn.from_string("cap:generate;ext=pdf;target=thumbnail;")
     assert urn.conforms_to(request1)
 
     # Subset match
-    request2 = TaggedUrn.from_string("cap:op=generate")
+    request2 = TaggedUrn.from_string("cap:generate")
     assert urn.conforms_to(request2)
 
     # Wildcard request should match specific URN
@@ -238,7 +238,7 @@ def test_tag_matching():
     assert urn.conforms_to(request3)  # URN has ext=pdf, request accepts any ext
 
     # No match - conflicting value
-    request4 = TaggedUrn.from_string("cap:op=extract")
+    request4 = TaggedUrn.from_string("cap:extract")
     assert not urn.conforms_to(request4)
 
 
@@ -258,7 +258,7 @@ def test_missing_tag_handling():
     # NEW SEMANTICS: Missing tag in instance means the tag doesn't exist.
     # Pattern constraints must be satisfied by instance.
 
-    urn = TaggedUrn.from_string("cap:op=generate")
+    urn = TaggedUrn.from_string("cap:generate")
 
     # Pattern with tag that instance doesn't have: NO MATCH
     # Pattern ext=pdf requires instance to have ext=pdf, but instance doesn't have ext
@@ -267,8 +267,8 @@ def test_missing_tag_handling():
 
     # Pattern missing tag = no constraint: MATCH
     # Instance has op=generate, pattern has no constraint on op
-    urn2 = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    pattern2 = TaggedUrn.from_string("cap:op=generate")
+    urn2 = TaggedUrn.from_string("cap:generate;ext=pdf")
+    pattern2 = TaggedUrn.from_string("cap:generate")
     assert urn2.conforms_to(pattern2)  # Instance has ext=pdf, pattern doesn't constrain ext
 
     # To match any value of a tag, use explicit ? or *
@@ -288,7 +288,7 @@ def test_specificity():
     # K=? (unspecified): 0 points
 
     urn1 = TaggedUrn.from_string("cap:general")  # value-less = * = 2 points
-    urn2 = TaggedUrn.from_string("cap:op=generate")  # exact = 3 points
+    urn2 = TaggedUrn.from_string("cap:generate")  # exact = 3 points
     urn3 = TaggedUrn.from_string("cap:op=*;ext=pdf")  # * + exact = 2 + 3 = 5 points
     urn4 = TaggedUrn.from_string("cap:op=?")  # ? = 0 points
     urn5 = TaggedUrn.from_string("cap:op=!")  # ! = 1 point
@@ -330,8 +330,8 @@ def test_builder_preserves_case():
 
 def test_compatibility():
     # TEST526: Test directional accepts between general and specific URNs
-    general = TaggedUrn.from_string("cap:op=generate")
-    specific = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    general = TaggedUrn.from_string("cap:generate")
+    specific = TaggedUrn.from_string("cap:generate;ext=pdf")
 
     # General pattern accepts specific instance (no constraint on ext)
     assert general.accepts(specific)
@@ -339,12 +339,12 @@ def test_compatibility():
     assert not specific.accepts(general)
 
     # Unrelated URNs: different op values, neither accepts the other
-    urn_extract = TaggedUrn.from_string("cap:image;op=extract")
+    urn_extract = TaggedUrn.from_string("cap:image;extract")
     assert not general.accepts(urn_extract)
     assert not urn_extract.accepts(general)
 
     # Wildcard format tag: general (no format constraint) accepts urn_format
-    urn_format = TaggedUrn.from_string("cap:op=generate;format=*")
+    urn_format = TaggedUrn.from_string("cap:generate;format=*")
     assert general.accepts(urn_format)
     # urn_format does NOT accept general: pattern format=* requires instance to have format tag
     assert not urn_format.accepts(general)
@@ -353,32 +353,32 @@ def test_compatibility():
 def test_best_match():
     urns = [
         TaggedUrn.from_string("cap:op=*"),
-        TaggedUrn.from_string("cap:op=generate"),
-        TaggedUrn.from_string("cap:op=generate;ext=pdf"),
+        TaggedUrn.from_string("cap:generate"),
+        TaggedUrn.from_string("cap:generate;ext=pdf"),
     ]
 
-    request = TaggedUrn.from_string("cap:op=generate")
+    request = TaggedUrn.from_string("cap:generate")
     best = UrnMatcher.find_best_match(urns, request)
 
     # Most specific URN that can handle the request
     # Alphabetical order: ext < op
-    assert str(best) == "cap:ext=pdf;op=generate"
+    assert str(best) == "cap:ext=pdf;generate"
 
 
 def test_merge_and_subset():
-    urn1 = TaggedUrn.from_string("cap:op=generate")
+    urn1 = TaggedUrn.from_string("cap:generate")
     urn2 = TaggedUrn.from_string("cap:ext=pdf;output=binary")
 
     merged = urn1.merge(urn2)
     # Alphabetical order: ext < op < output
-    assert str(merged) == "cap:ext=pdf;op=generate;output=binary"
+    assert str(merged) == "cap:ext=pdf;generate;output=binary"
 
     subset = merged.subset(["type", "ext"])
     assert str(subset) == "cap:ext=pdf"
 
 
 def test_merge_prefix_mismatch():
-    urn1 = TaggedUrn.from_string("cap:op=generate")
+    urn1 = TaggedUrn.from_string("cap:generate")
     urn2 = TaggedUrn.from_string("myapp:ext=pdf")
 
     with pytest.raises(TaggedUrnError):
@@ -408,7 +408,7 @@ def test_empty_tagged_urn():
     # Empty PATTERN matches any INSTANCE (pattern has no constraints)
     # Empty INSTANCE only matches patterns that have no required tags
 
-    specific_urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    specific_urn = TaggedUrn.from_string("cap:generate;ext=pdf")
 
     # Empty instance vs specific pattern: NO MATCH
     # Pattern requires op=generate and ext=pdf, instance doesn't have them
@@ -526,102 +526,102 @@ def test_semantic_equivalence():
 
 def test_matching_semantics_test1_exact_match():
     # Test 1: Exact match
-    # URN:     cap:op=generate;ext=pdf
-    # Request: cap:op=generate;ext=pdf
+    # URN:     cap:generate;ext=pdf
+    # Request: cap:generate;ext=pdf
     # Result:  MATCH
-    urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    request = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    urn = TaggedUrn.from_string("cap:generate;ext=pdf")
+    request = TaggedUrn.from_string("cap:generate;ext=pdf")
     assert urn.conforms_to(request), "Test 1: Exact match should succeed"
 
 
 def test_matching_semantics_test2_instance_missing_tag():
     # Test 2: Instance missing tag
     # Instance: cap:op=generate
-    # Pattern:  cap:op=generate;ext=pdf
+    # Pattern:  cap:generate;ext=pdf
     # Result:   NO MATCH (pattern requires ext=pdf, instance doesn't have ext)
     #
     # NEW SEMANTICS: Missing tag in instance means it doesn't exist.
     # Pattern K=v requires instance to have K=v.
-    instance = TaggedUrn.from_string("cap:op=generate")
-    pattern = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    instance = TaggedUrn.from_string("cap:generate")
+    pattern = TaggedUrn.from_string("cap:generate;ext=pdf")
     assert not instance.conforms_to(pattern), "Test 2: Instance missing tag should NOT match when pattern requires it"
 
     # To accept any ext (or missing), use pattern with ext=?
-    pattern_optional = TaggedUrn.from_string("cap:op=generate;ext=?")
+    pattern_optional = TaggedUrn.from_string("cap:generate;ext=?")
     assert instance.conforms_to(pattern_optional), "Pattern with ext=? should match instance without ext"
 
 
 def test_matching_semantics_test3_urn_has_extra_tag():
     # Test 3: URN has extra tag
-    # URN:     cap:op=generate;ext=pdf;version=2
-    # Request: cap:op=generate;ext=pdf
+    # URN:     cap:generate;ext=pdf;version=2
+    # Request: cap:generate;ext=pdf
     # Result:  MATCH (request doesn't constrain version)
-    urn = TaggedUrn.from_string("cap:op=generate;ext=pdf;version=2")
-    request = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    urn = TaggedUrn.from_string("cap:generate;ext=pdf;version=2")
+    request = TaggedUrn.from_string("cap:generate;ext=pdf")
     assert urn.conforms_to(request), "Test 3: URN with extra tag should match"
 
 
 def test_matching_semantics_test4_request_has_wildcard():
     # Test 4: Request has wildcard
-    # URN:     cap:op=generate;ext=pdf
-    # Request: cap:op=generate;ext=*
+    # URN:     cap:generate;ext=pdf
+    # Request: cap:generate;ext=*
     # Result:  MATCH (request accepts any ext)
-    urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    request = TaggedUrn.from_string("cap:op=generate;ext=*")
+    urn = TaggedUrn.from_string("cap:generate;ext=pdf")
+    request = TaggedUrn.from_string("cap:generate;ext=*")
     assert urn.conforms_to(request), "Test 4: Request wildcard should match"
 
 
 def test_matching_semantics_test5_urn_has_wildcard():
     # Test 5: URN has wildcard
-    # URN:     cap:op=generate;ext=*
-    # Request: cap:op=generate;ext=pdf
+    # URN:     cap:generate;ext=*
+    # Request: cap:generate;ext=pdf
     # Result:  MATCH (URN handles any ext)
-    urn = TaggedUrn.from_string("cap:op=generate;ext=*")
-    request = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    urn = TaggedUrn.from_string("cap:generate;ext=*")
+    request = TaggedUrn.from_string("cap:generate;ext=pdf")
     assert urn.conforms_to(request), "Test 5: URN wildcard should match"
 
 
 def test_matching_semantics_test6_value_mismatch():
     # Test 6: Value mismatch
-    # URN:     cap:op=generate;ext=pdf
-    # Request: cap:op=generate;ext=docx
+    # URN:     cap:generate;ext=pdf
+    # Request: cap:generate;ext=docx
     # Result:  NO MATCH
-    urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    request = TaggedUrn.from_string("cap:op=generate;ext=docx")
+    urn = TaggedUrn.from_string("cap:generate;ext=pdf")
+    request = TaggedUrn.from_string("cap:generate;ext=docx")
     assert not urn.conforms_to(request), "Test 6: Value mismatch should not match"
 
 
 def test_matching_semantics_test7_pattern_has_extra_tag():
     # Test 7: Pattern has extra tag that instance doesn't have
-    # Instance: cap:op=generate_thumbnail;out="media:binary"
-    # Pattern:  cap:op=generate_thumbnail;out="media:binary";ext=wav
+    # Instance: cap:generate-thumbnail;out="media:binary"
+    # Pattern:  cap:generate-thumbnail;out="media:binary";ext=wav
     # Result:   NO MATCH (pattern requires ext=wav, instance doesn't have ext)
     #
     # NEW SEMANTICS: Pattern K=v requires instance to have K=v
-    instance = TaggedUrn.from_string(r'cap:op=generate_thumbnail;out="media:binary"')
-    pattern = TaggedUrn.from_string(r'cap:op=generate_thumbnail;out="media:binary";ext=wav')
+    instance = TaggedUrn.from_string(r'cap:generate-thumbnail;out="media:binary"')
+    pattern = TaggedUrn.from_string(r'cap:generate-thumbnail;out="media:binary";ext=wav')
     assert not instance.conforms_to(pattern), "Test 7: Instance missing ext should NOT match when pattern requires ext=wav"
 
     # Instance vs pattern that doesn't constrain ext: MATCH
-    pattern_no_ext = TaggedUrn.from_string(r'cap:op=generate_thumbnail;out="media:binary"')
+    pattern_no_ext = TaggedUrn.from_string(r'cap:generate-thumbnail;out="media:binary"')
     assert instance.conforms_to(pattern_no_ext)
 
 
 def test_matching_semantics_test8_empty_pattern_matches_anything():
     # Test 8: Empty PATTERN matches any INSTANCE
-    # Instance: cap:op=generate;ext=pdf
+    # Instance: cap:generate;ext=pdf
     # Pattern:  cap:
     # Result:   MATCH (pattern has no constraints)
     #
     # NEW SEMANTICS: Empty pattern = no constraints = matches any instance
     # But empty instance only matches patterns that don't require tags
-    instance = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    instance = TaggedUrn.from_string("cap:generate;ext=pdf")
     empty_pattern = TaggedUrn.from_string("cap:")
     assert instance.conforms_to(empty_pattern), "Test 8: Any instance should match empty pattern"
 
     # Empty instance vs pattern with requirements: NO MATCH
     empty_instance = TaggedUrn.from_string("cap:")
-    pattern = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    pattern = TaggedUrn.from_string("cap:generate;ext=pdf")
     assert not empty_instance.conforms_to(pattern), "Empty instance should NOT match pattern with requirements"
 
 
@@ -632,20 +632,20 @@ def test_matching_semantics_test9_cross_dimension_constraints():
     # Result:   NO MATCH (pattern requires ext=pdf, instance doesn't have ext)
     #
     # NEW SEMANTICS: Pattern K=v requires instance to have K=v
-    instance = TaggedUrn.from_string("cap:op=generate")
+    instance = TaggedUrn.from_string("cap:generate")
     pattern = TaggedUrn.from_string("cap:ext=pdf")
     assert not instance.conforms_to(pattern), "Test 9: Instance without ext should NOT match pattern requiring ext"
 
     # Instance with ext vs pattern with different tag only: MATCH
-    instance2 = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    instance2 = TaggedUrn.from_string("cap:generate;ext=pdf")
     pattern2 = TaggedUrn.from_string("cap:ext=pdf")
     assert instance2.conforms_to(pattern2), "Instance with ext=pdf should match pattern requiring ext=pdf"
 
 
 def test_matching_different_prefixes_error():
     # URNs with different prefixes should cause an error, not just return false
-    urn1 = TaggedUrn.from_string("cap:op=test")
-    urn2 = TaggedUrn.from_string("other:op=test")
+    urn1 = TaggedUrn.from_string("cap:test")
+    urn2 = TaggedUrn.from_string("other:test")
 
     with pytest.raises(TaggedUrnError):
         urn1.conforms_to(urn2)
@@ -682,21 +682,21 @@ def test_valueless_tag_parsing_multiple():
 
 def test_valueless_tag_mixed_with_valued():
     # Mix of value-less and valued tags
-    urn = TaggedUrn.from_string("cap:op=generate;optimize;ext=pdf;secure")
+    urn = TaggedUrn.from_string("cap:generate;optimize;ext=pdf;secure")
     assert urn.get_tag("op") == "generate"
     assert urn.get_tag("optimize") == "*"
     assert urn.get_tag("ext") == "pdf"
     assert urn.get_tag("secure") == "*"
     # Serializes alphabetically
-    assert str(urn) == "cap:ext=pdf;op=generate;optimize;secure"
+    assert str(urn) == "cap:ext=pdf;generate;optimize;secure"
 
 
 def test_valueless_tag_at_end():
     # Value-less tag at the end (no trailing semicolon)
-    urn = TaggedUrn.from_string("cap:op=generate;optimize")
+    urn = TaggedUrn.from_string("cap:generate;optimize")
     assert urn.get_tag("op") == "generate"
     assert urn.get_tag("optimize") == "*"
-    assert str(urn) == "cap:op=generate;optimize"
+    assert str(urn) == "cap:generate;optimize"
 
 
 def test_valueless_tag_equivalence_to_wildcard():
@@ -711,11 +711,11 @@ def test_valueless_tag_equivalence_to_wildcard():
 
 def test_valueless_tag_matching():
     # Value-less tag (wildcard) matches any value
-    urn = TaggedUrn.from_string("cap:op=generate;ext")
+    urn = TaggedUrn.from_string("cap:generate;ext")
 
-    request_pdf = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    request_docx = TaggedUrn.from_string("cap:op=generate;ext=docx")
-    request_any = TaggedUrn.from_string("cap:op=generate;ext=anything")
+    request_pdf = TaggedUrn.from_string("cap:generate;ext=pdf")
+    request_docx = TaggedUrn.from_string("cap:generate;ext=docx")
+    request_any = TaggedUrn.from_string("cap:generate;ext=anything")
 
     assert urn.conforms_to(request_pdf)
     assert urn.conforms_to(request_docx)
@@ -724,11 +724,11 @@ def test_valueless_tag_matching():
 
 def test_valueless_tag_in_pattern():
     # Pattern with value-less tag (K=*) requires instance to have the tag
-    pattern = TaggedUrn.from_string("cap:op=generate;ext")
+    pattern = TaggedUrn.from_string("cap:generate;ext")
 
-    instance_pdf = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    instance_docx = TaggedUrn.from_string("cap:op=generate;ext=docx")
-    instance_missing = TaggedUrn.from_string("cap:op=generate")
+    instance_pdf = TaggedUrn.from_string("cap:generate;ext=pdf")
+    instance_docx = TaggedUrn.from_string("cap:generate;ext=docx")
+    instance_missing = TaggedUrn.from_string("cap:generate")
 
     # NEW SEMANTICS: K=* (valueless tag) means must-have-any
     assert instance_pdf.conforms_to(pattern)  # Has ext=pdf
@@ -736,7 +736,7 @@ def test_valueless_tag_in_pattern():
     assert not instance_missing.conforms_to(pattern)  # Missing ext, pattern requires it
 
     # To accept missing ext, use ? instead
-    pattern_optional = TaggedUrn.from_string("cap:op=generate;ext=?")
+    pattern_optional = TaggedUrn.from_string("cap:generate;ext=?")
     assert instance_missing.conforms_to(pattern_optional)
 
 
@@ -744,9 +744,9 @@ def test_valueless_tag_specificity():
     # NEW GRADED SPECIFICITY:
     # K=v (exact): 3, K=* (must-have-any): 2, K=! (must-not): 1, K=? (unspecified): 0
 
-    urn1 = TaggedUrn.from_string("cap:op=generate")
-    urn2 = TaggedUrn.from_string("cap:op=generate;optimize")  # optimize = *
-    urn3 = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+    urn1 = TaggedUrn.from_string("cap:generate")
+    urn2 = TaggedUrn.from_string("cap:generate;optimize")  # optimize = *
+    urn3 = TaggedUrn.from_string("cap:generate;ext=pdf")
 
     assert urn1.specificity() == 3  # 1 exact = 3
     assert urn2.specificity() == 5  # 1 exact + 1 * = 3 + 2 = 5
@@ -755,7 +755,7 @@ def test_valueless_tag_specificity():
 
 def test_valueless_tag_roundtrip():
     # Round-trip parsing and serialization
-    original = "cap:ext=pdf;op=generate;optimize;secure"
+    original = "cap:ext=pdf;generate;optimize;secure"
     urn = TaggedUrn.from_string(original)
     serialized = str(urn)
     reparsed = TaggedUrn.from_string(serialized)
@@ -782,9 +782,9 @@ def test_empty_value_still_error():
 
 def test_valueless_tag_compatibility():
     # TEST564: Value-less tags (wildcard) accept any specific value
-    urn_wildcard = TaggedUrn.from_string("cap:op=generate;ext")  # ext=*
-    urn_pdf = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    urn_docx = TaggedUrn.from_string("cap:op=generate;ext=docx")
+    urn_wildcard = TaggedUrn.from_string("cap:generate;ext")  # ext=*
+    urn_pdf = TaggedUrn.from_string("cap:generate;ext=pdf")
+    urn_docx = TaggedUrn.from_string("cap:generate;ext=docx")
 
     # Wildcard pattern accepts specific instances
     assert urn_wildcard.accepts(urn_pdf)
@@ -802,13 +802,13 @@ def test_valueless_numeric_key_still_rejected():
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:123")
     with pytest.raises(TaggedUrnError):
-        TaggedUrn.from_string("cap:op=generate;456")
+        TaggedUrn.from_string("cap:generate;456")
 
 
 def test_whitespace_in_input_rejected():
     # Leading whitespace fails hard
     with pytest.raises(TaggedUrnError):
-        TaggedUrn.from_string(" cap:op=test")
+        TaggedUrn.from_string(" cap:test")
 
     # Trailing whitespace fails hard
     with pytest.raises(TaggedUrnError):
@@ -820,12 +820,12 @@ def test_whitespace_in_input_rejected():
 
     # Tab and newline also count as whitespace
     with pytest.raises(TaggedUrnError):
-        TaggedUrn.from_string("\tcap:op=test")
+        TaggedUrn.from_string("\tcap:test")
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:op=test\n")
 
     # Clean input works
-    assert TaggedUrn.from_string("cap:op=test")
+    assert TaggedUrn.from_string("cap:test")
 
 
 # ============================================================================
@@ -1071,8 +1071,8 @@ def test_specificity_with_special_values():
 
 # TEST578: Equivalent URNs with identical tag sets
 def test_578_equivalent_identical_tags():
-    a = TaggedUrn.from_string("cap:op=generate;ext=pdf")
-    b = TaggedUrn.from_string("cap:ext=pdf;op=generate")  # same tags, different order
+    a = TaggedUrn.from_string("cap:generate;ext=pdf")
+    b = TaggedUrn.from_string("cap:ext=pdf;generate")  # same tags, different order
     assert a.is_equivalent(b)
     assert b.is_equivalent(a)  # symmetric
 
@@ -1109,22 +1109,22 @@ def test_581_incomparable_different_branches():
 
 # TEST582: Equivalent implies comparable but not vice versa
 def test_582_equivalent_implies_comparable():
-    a = TaggedUrn.from_string("cap:op=test;ext=pdf")
-    b = TaggedUrn.from_string("cap:op=test;ext=pdf")
+    a = TaggedUrn.from_string("cap:test;ext=pdf")
+    b = TaggedUrn.from_string("cap:test;ext=pdf")
     # equivalent → comparable (AND implies OR)
     assert a.is_equivalent(b)
     assert a.is_comparable(b)
 
     # comparable but NOT equivalent
-    general = TaggedUrn.from_string("cap:op=test")
-    specific = TaggedUrn.from_string("cap:op=test;ext=pdf")
+    general = TaggedUrn.from_string("cap:test")
+    specific = TaggedUrn.from_string("cap:test;ext=pdf")
     assert not general.is_equivalent(specific)
     assert general.is_comparable(specific)
 
 
 # TEST583: Prefix mismatch raises error for both relations
 def test_583_prefix_mismatch_errors():
-    cap = TaggedUrn.from_string("cap:op=test")
+    cap = TaggedUrn.from_string("cap:test")
     media = TaggedUrn.from_string("media:")
     with pytest.raises(TaggedUrnError):
         cap.is_equivalent(media)
@@ -1275,7 +1275,7 @@ def test_593_builder_wildcards():
            .build())
 
     # Wildcards serialize as value-less
-    assert str(urn) == "cap:ext;op=convert;quality"
+    assert str(urn) == "cap:ext;convert;quality"
     # NEW GRADED SPECIFICITY: op=convert (exact) = 3, ext=* = 2, quality=* = 2
     # Total = 3 + 2 + 2 = 7
     assert urn.specificity() == 7

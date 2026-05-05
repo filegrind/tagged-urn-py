@@ -92,7 +92,7 @@ class TaggedUrn:
     """A tagged URN using flat, ordered tags with a configurable prefix
 
     Examples:
-    - `cap:op=generate;ext=pdf;output=binary;target=thumbnail`
+    - `cap:generate;ext=pdf;output=binary;target=thumbnail`
     - `myapp:key="Value With Spaces"`
     - `custom:a=1;b=2`
     """

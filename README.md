@@ -21,7 +21,7 @@ prefix:key1=value1;key2=value2;...
 ```
 
 Examples:
-- `cap:op=generate;ext=pdf;target=thumbnail`
+- `cap:generate;ext=pdf;target=thumbnail`
 - `myapp:key="Value With Spaces"`
 - `custom:a=1;b=2;c`  (value-less tag, equivalent to c=*)
 
@@ -44,7 +44,7 @@ pip install tagged-urn
 from tagged_urn import TaggedUrn, TaggedUrnBuilder
 
 # Parse from string
-urn = TaggedUrn.from_string("cap:op=generate;ext=pdf")
+urn = TaggedUrn.from_string("cap:generate;ext=pdf")
 
 # Build programmatically (fluent interface)
 urn = (TaggedUrnBuilder("cap")
