@@ -55,9 +55,9 @@ def test_unquoted_values_lowercased():
     assert urn.get_tag("ext") == "pdf"
     assert urn.get_tag("target") == "thumbnail"
 
-    # Key lookup is case-insensitive
-    assert urn.get_tag("OP") == "generate"
-    assert urn.get_tag("Op") == "generate"
+    # Key lookup is case-insensitive (uppercase variants of an existing key resolve correctly)
+    assert urn.get_tag("EXT") == "pdf"
+    assert urn.get_tag("Ext") == "pdf"
 
     # Both URNs parse to same lowercase values (same tags, same values)
     urn2 = TaggedUrn.from_string("cap:generate;ext=pdf;target=thumbnail;")
@@ -281,17 +281,17 @@ def test_missing_tag_handling():
 
 
 def test_specificity():
-    # NEW GRADED SPECIFICITY:
+    # GRADED SPECIFICITY:
     # K=v (exact value): 3 points
-    # K=* (must-have-any): 2 points
+    # K=* (must-have-any / marker): 2 points
     # K=! (must-not-have): 1 point
     # K=? (unspecified): 0 points
 
-    urn1 = TaggedUrn.from_string("cap:general")  # value-less = * = 2 points
-    urn2 = TaggedUrn.from_string("cap:generate")  # exact = 3 points
-    urn3 = TaggedUrn.from_string("cap:op;ext=pdf")  # * + exact = 2 + 3 = 5 points
-    urn4 = TaggedUrn.from_string("cap:op=?")  # ? = 0 points
-    urn5 = TaggedUrn.from_string("cap:op=!")  # ! = 1 point
+    urn1 = TaggedUrn.from_string("cap:general")        # 1 marker
+    urn2 = TaggedUrn.from_string("cap:ext=pdf")        # 1 exact-valued tag
+    urn3 = TaggedUrn.from_string("cap:gen;ext=pdf")    # 1 marker + 1 exact
+    urn4 = TaggedUrn.from_string("cap:ext=?")          # 1 unspecified
+    urn5 = TaggedUrn.from_string("cap:ext=!")          # 1 must-not-have
 
     assert urn1.specificity() == 2  # * = 2
     assert urn2.specificity() == 3  # exact = 3
@@ -309,7 +309,7 @@ def test_specificity():
 
 def test_builder():
     urn = (TaggedUrnBuilder("cap")
-           .tag("op", "generate")
+           .marker("generate")
            .tag("target", "thumbnail")
            .tag("ext", "pdf")
            .tag("output", "binary")
@@ -741,16 +741,16 @@ def test_valueless_tag_in_pattern():
 
 
 def test_valueless_tag_specificity():
-    # NEW GRADED SPECIFICITY:
-    # K=v (exact): 3, K=* (must-have-any): 2, K=! (must-not): 1, K=? (unspecified): 0
+    # GRADED SPECIFICITY:
+    # K=v (exact): 3, K=* (must-have-any / marker): 2, K=! (must-not): 1, K=? (unspecified): 0
 
-    urn1 = TaggedUrn.from_string("cap:generate")
-    urn2 = TaggedUrn.from_string("cap:generate;optimize")  # optimize = *
-    urn3 = TaggedUrn.from_string("cap:generate;ext=pdf")
+    urn1 = TaggedUrn.from_string("cap:generate")          # 1 marker
+    urn2 = TaggedUrn.from_string("cap:generate;optimize") # 2 markers
+    urn3 = TaggedUrn.from_string("cap:generate;ext=pdf")  # 1 marker + 1 exact
 
-    assert urn1.specificity() == 3  # 1 exact = 3
-    assert urn2.specificity() == 5  # 1 exact + 1 * = 3 + 2 = 5
-    assert urn3.specificity() == 6  # 2 exact = 3 + 3 = 6
+    assert urn1.specificity() == 2  # 1 marker = 2
+    assert urn2.specificity() == 4  # 2 markers = 2 + 2 = 4
+    assert urn3.specificity() == 5  # 1 marker + 1 exact = 2 + 3 = 5
 
 
 def test_valueless_tag_roundtrip():
@@ -1187,7 +1187,7 @@ def test_586_special_values():
 # TEST587: Builder fluent API for tag manipulation
 def test_587_builder_fluent_api():
     urn = (TaggedUrnBuilder("cap")
-           .tag("op", "generate")
+           .marker("generate")
            .tag("target", "thumbnail")
            .tag("format", "pdf")
            .tag("output", "binary")
@@ -1204,7 +1204,7 @@ def test_588_builder_custom_tags():
     urn = (TaggedUrnBuilder("cap")
            .tag("engine", "v2")
            .tag("quality", "high")
-           .tag("op", "compress")
+           .marker("compress")
            .build())
 
     assert urn.get_tag("engine") == "v2"
@@ -1215,7 +1215,7 @@ def test_588_builder_custom_tags():
 # TEST589: Builder tag overrides (last value wins)
 def test_589_builder_tag_overrides():
     urn = (TaggedUrnBuilder("cap")
-           .tag("op", "convert")
+           .marker("convert")
            .tag("format", "jpg")
            .build())
 
@@ -1244,7 +1244,7 @@ def test_591_builder_single_tag():
 def test_592_builder_complex():
     urn = (TaggedUrnBuilder("cap")
            .tag("type", "media")
-           .tag("op", "transcode")
+           .marker("transcode")
            .tag("target", "video")
            .tag("format", "mp4")
            .tag("codec", "h264")
@@ -1262,23 +1262,26 @@ def test_592_builder_complex():
     assert urn.get_tag("framerate") == "30fps"
     assert urn.get_tag("output") == "binary"
 
-    # NEW GRADED SPECIFICITY: 8 exact values × 3 points each = 24
-    assert urn.specificity() == 24
+    # GRADED SPECIFICITY: 7 exact-valued tags × 3 + 1 marker (transcode) × 2 = 21 + 2 = 23
+    assert urn.specificity() == 23
 
 
 # TEST593: Builder with wildcards
 def test_593_builder_wildcards():
     urn = (TaggedUrnBuilder("cap")
-           .tag("op", "convert")
-           .marker("ext")  # Wildcard
-           .marker("quality")  # Wildcard
+           .marker("convert")
+           .marker("ext")
+           .marker("quality")
            .build())
 
-    # Wildcards serialize as value-less
-    assert str(urn) == "cap:ext;convert;quality"
-    # NEW GRADED SPECIFICITY: convert (exact) = 3, ext=* = 2, quality=* = 2
-    # Total = 3 + 2 + 2 = 7
-    assert urn.specificity() == 7
+    # Three markers serialize as value-less, sorted alphabetically.
+    assert str(urn) == "cap:convert;ext;quality"
+    # GRADED SPECIFICITY: 3 markers × 2 points each = 6
+    assert urn.specificity() == 6
+
+    assert urn.has_marker_tag("convert")
+    assert urn.has_marker_tag("ext")
+    assert urn.has_marker_tag("quality")
 
     assert urn.get_tag("ext") == "*"
     assert urn.get_tag("quality") == "*"

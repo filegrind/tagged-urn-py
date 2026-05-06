@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tagged-urn"
-version = "0.18.83"
+version = "0.19.91"
 description = "Tagged URN - Flat tag-based identifier system"
 authors = [{name = "https://github.com/machinefabric"}]
 license = {text = "MIT"}
