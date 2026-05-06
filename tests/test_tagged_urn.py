@@ -1270,8 +1270,8 @@ def test_592_builder_complex():
 def test_593_builder_wildcards():
     urn = (TaggedUrnBuilder("cap")
            .tag("op", "convert")
-           .solo_tag("ext")  # Wildcard
-           .solo_tag("quality")  # Wildcard
+           .marker("ext")  # Wildcard
+           .marker("quality")  # Wildcard
            .build())
 
     # Wildcards serialize as value-less
@@ -1308,7 +1308,7 @@ def test_595_builder_matching_with_built_urn():
     wildcard_pattern = (TaggedUrnBuilder("cap")
                         .tag("op", "generate")
                         .tag("target", "thumbnail")
-                        .solo_tag("ext")
+                        .marker("ext")
                         .build())
 
     # Specific instance should match general pattern (pattern has fewer constraints)

@@ -739,7 +739,7 @@ class TaggedUrnBuilder:
         self.tags[key.lower()] = value
         return self
 
-    def solo_tag(self, key: str) -> 'TaggedUrnBuilder':
+    def marker(self, key: str) -> 'TaggedUrnBuilder':
         """Add a tag with key (normalized to lowercase) and wildcard value"""
         self.tags[key.lower()] = "*"
         return self
