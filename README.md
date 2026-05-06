@@ -48,12 +48,14 @@ urn = TaggedUrn.from_string("cap:generate;ext=pdf")
 
 # Build programmatically (fluent interface)
 urn = (TaggedUrnBuilder("cap")
-       .tag("op", "generate")
+       .marker("generate")
        .tag("ext", "pdf")
        .build())
 
-# Check if URN matches a pattern
-pattern = TaggedUrn.from_string("cap:op=*;ext=pdf")
+# Check if URN matches a pattern (the pattern requires the `generate`
+# marker; the URN's `ext=pdf` is unconstrained because the pattern has
+# no `ext` tag).
+pattern = TaggedUrn.from_string("cap:generate")
 assert urn.conforms_to(pattern)
 
 # Get specificity score

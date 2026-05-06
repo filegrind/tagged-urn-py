@@ -370,6 +370,16 @@ class TaggedUrn:
         """
         return self.tags.get(key.lower()) == value
 
+    def has_marker_tag(self, tag_name: str) -> bool:
+        """Check whether a marker tag (a tag whose value is "*") is present.
+
+        Equivalent to has_tag(tag_name, "*") but expresses authorial intent:
+        this tag is present as a marker (a wildcard-valued tag that
+        serializes as just the key), not as a key=value pair.
+        Example: ``cap:constrained;...`` has marker tag "constrained".
+        """
+        return self.tags.get(tag_name.lower()) == "*"
+
     def with_tag(self, key: str, value: str) -> 'TaggedUrn':
         """Add or update a tag
 
