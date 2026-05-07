@@ -21,6 +21,7 @@ from .tagged_urn import (
     PrefixMismatchError,
     NumericKeyError,
     InvalidTagFormatError,
+    score_tag_value,
 )
 
 __version__ = "0.14.3800"
@@ -42,4 +43,5 @@ __all__ = [
     "PrefixMismatchError",
     "NumericKeyError",
     "InvalidTagFormatError",
+    "score_tag_value",
 ]

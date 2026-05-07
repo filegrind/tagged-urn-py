@@ -32,8 +32,8 @@ This catalog lists all tests in the Python codebase.
 | test591 | `test_591_builder_single_tag` | TEST591: Builder with single tag | tests/test_tagged_urn.py:1234 |
 | test592 | `test_592_builder_complex` | TEST592: Builder with complex multi-tag URN | tests/test_tagged_urn.py:1244 |
 | test593 | `test_593_builder_wildcards` | TEST593: Builder with wildcards | tests/test_tagged_urn.py:1270 |
-| test594 | `test_594_builder_custom_prefix` | TEST594: Builder with custom prefix | tests/test_tagged_urn.py:1288 |
-| test595 | `test_595_builder_matching_with_built_urn` | TEST595: Builder matching with built URN | tests/test_tagged_urn.py:1296 |
+| test594 | `test_594_builder_custom_prefix` | TEST594: Builder with custom prefix | tests/test_tagged_urn.py:1291 |
+| test595 | `test_595_builder_matching_with_built_urn` | TEST595: Builder matching with built URN | tests/test_tagged_urn.py:1299 |
 | | | | |
 | unnumbered | `test_best_match` |  | tests/test_tagged_urn.py:353 |
 | unnumbered | `test_builder` |  | tests/test_tagged_urn.py:310 |

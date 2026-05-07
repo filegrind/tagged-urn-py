@@ -48,7 +48,7 @@ def test_builder_with_prefix():
 
 def test_unquoted_values_lowercased():
     # Unquoted values are normalized to lowercase
-    urn = TaggedUrn.from_string("cap:ext=pdf;generate;in=media:;out=media:;target=thumbnail;")
+    urn = TaggedUrn.from_string("cap:ext=pdf;generate;target=thumbnail;")
 
     # Keys are always lowercase
     assert urn.has_marker_tag("generate")
@@ -59,8 +59,9 @@ def test_unquoted_values_lowercased():
     assert urn.get_tag("EXT") == "pdf"
     assert urn.get_tag("Ext") == "pdf"
 
-    # Both URNs parse to same lowercase values (same tags, same values)
-    urn2 = TaggedUrn.from_string("cap:generate;ext=pdf;target=thumbnail;")
+    # Tag order in the source string does not affect canonical form —
+    # parsed URNs sort tags alphabetically before serializing.
+    urn2 = TaggedUrn.from_string("cap:target=thumbnail;ext=pdf;generate;")
     assert str(urn) == str(urn2)
     assert urn == urn2
 
@@ -281,30 +282,37 @@ def test_missing_tag_handling():
 
 
 def test_specificity():
-    # GRADED SPECIFICITY:
-    # K=v (exact value): 3 points
-    # K=* (must-have-any / marker): 2 points
-    # K=! (must-not-have): 1 point
-    # K=? (unspecified): 0 points
+    # Six-form per-tag specificity ladder:
+    #   ?x        : 0  (no constraint)
+    #   x?=v      : 1  (absent OR not v)
+    #   x (=x=*)  : 2  (must-have-any)
+    #   x!=v      : 3  (present and not v)
+    #   x=v       : 4  (must-have-this-value)
+    #   !x        : 5  (must-not-have)
 
-    urn1 = TaggedUrn.from_string("cap:general")        # 1 marker
-    urn2 = TaggedUrn.from_string("cap:ext=pdf")        # 1 exact-valued tag
-    urn3 = TaggedUrn.from_string("cap:gen;ext=pdf")    # 1 marker + 1 exact
-    urn4 = TaggedUrn.from_string("cap:ext=?")          # 1 unspecified
-    urn5 = TaggedUrn.from_string("cap:ext=!")          # 1 must-not-have
+    urn1 = TaggedUrn.from_string("cap:general")        # bare marker -> 2
+    urn2 = TaggedUrn.from_string("cap:ext=pdf")        # exact -> 4
+    urn3 = TaggedUrn.from_string("cap:gen;ext=pdf")    # marker(2) + exact(4)
+    urn4 = TaggedUrn.from_string("cap:?ext")           # ?x -> 0
+    urn5 = TaggedUrn.from_string("cap:!ext")           # !x -> 5
+    urn6 = TaggedUrn.from_string("cap:ext?=pdf")       # x?=v -> 1
+    urn7 = TaggedUrn.from_string("cap:ext!=pdf")       # x!=v -> 3
 
-    assert urn1.specificity() == 2  # * = 2
-    assert urn2.specificity() == 3  # exact = 3
-    assert urn3.specificity() == 5  # * + exact = 2 + 3
-    assert urn4.specificity() == 0  # ? = 0
-    assert urn5.specificity() == 1  # ! = 1
+    assert urn1.specificity() == 2
+    assert urn2.specificity() == 4
+    assert urn3.specificity() == 6
+    assert urn4.specificity() == 0
+    assert urn5.specificity() == 5
+    assert urn6.specificity() == 1
+    assert urn7.specificity() == 3
 
-    # Specificity tuple for tie-breaking: (exact_count, must_have_any_count, must_not_count)
-    assert urn2.specificity_tuple() == (1, 0, 0)
-    assert urn3.specificity_tuple() == (1, 1, 0)
-    assert urn5.specificity_tuple() == (0, 0, 1)
+    # Five-tuple counts: (must_not_have, exact, present_not_value,
+    # must_have_any, absent_or_not_value).
+    assert urn2.specificity_tuple() == (0, 1, 0, 0, 0)
+    assert urn3.specificity_tuple() == (0, 1, 0, 1, 0)
+    assert urn5.specificity_tuple() == (1, 0, 0, 0, 0)
 
-    assert urn2.is_more_specific_than(urn1)  # 3 > 2
+    assert urn2.is_more_specific_than(urn1)  # exact(4) > marker(2)
 
 
 def test_builder():
@@ -741,16 +749,14 @@ def test_valueless_tag_in_pattern():
 
 
 def test_valueless_tag_specificity():
-    # GRADED SPECIFICITY:
-    # K=v (exact): 3, K=* (must-have-any / marker): 2, K=! (must-not): 1, K=? (unspecified): 0
-
+    # Six-form ladder: ?x=0, x?=v=1, x=*=2, x!=v=3, x=v=4, !x=5.
     urn1 = TaggedUrn.from_string("cap:generate")          # 1 marker
     urn2 = TaggedUrn.from_string("cap:generate;optimize") # 2 markers
     urn3 = TaggedUrn.from_string("cap:generate;ext=pdf")  # 1 marker + 1 exact
 
     assert urn1.specificity() == 2  # 1 marker = 2
     assert urn2.specificity() == 4  # 2 markers = 2 + 2 = 4
-    assert urn3.specificity() == 5  # 1 marker + 1 exact = 2 + 3 = 5
+    assert urn3.specificity() == 6  # 1 marker + 1 exact = 2 + 4 = 6
 
 
 def test_valueless_tag_roundtrip():
@@ -833,19 +839,19 @@ def test_whitespace_in_input_rejected():
 # ============================================================================
 
 def test_unspecified_question_mark_parsing():
-    # ? parses as unspecified
+    # All three input aliases (?x, x?, x=?) parse to stored value "?"
+    # and serialize as the canonical prefix form `?x`.
     urn = TaggedUrn.from_string("cap:ext=?")
     assert urn.get_tag("ext") == "?"
-    # Serializes as key=?
-    assert str(urn) == "cap:ext=?"
+    assert str(urn) == "cap:?ext"
 
 
 def test_must_not_have_exclamation_parsing():
-    # ! parses as must-not-have
+    # All three input aliases (!x, x!, x=!) parse to stored value "!"
+    # and serialize as the canonical prefix form `!x`.
     urn = TaggedUrn.from_string("cap:ext=!")
     assert urn.get_tag("ext") == "!"
-    # Serializes as key=!
-    assert str(urn) == "cap:ext=!"
+    assert str(urn) == "cap:!ext"
 
 
 def test_question_mark_pattern_matches_anything():
@@ -1044,25 +1050,27 @@ def test_compatibility_with_special_values():
 
 
 def test_specificity_with_special_values():
-    # Verify graded specificity scoring
-    exact = TaggedUrn.from_string("cap:a=x;b=y;c=z")  # 3*3 = 9
-    must_have = TaggedUrn.from_string("cap:a;b;c")  # 3*2 = 6
-    must_not = TaggedUrn.from_string("cap:a=!;b=!;c=!")  # 3*1 = 3
-    unspecified = TaggedUrn.from_string("cap:a=?;b=?;c=?")  # 3*0 = 0
-    mixed = TaggedUrn.from_string("cap:a=x;b;c=!;d=?")  # 3+2+1+0 = 6
+    # Six-form ladder: ?x=0, x?=v=1, x=*=2, x!=v=3, x=v=4, !x=5.
+    exact = TaggedUrn.from_string("cap:a=x;b=y;c=z")          # 3 * 4 = 12
+    must_have = TaggedUrn.from_string("cap:a;b;c")            # 3 * 2 = 6
+    must_not = TaggedUrn.from_string("cap:!a;!b;!c")          # 3 * 5 = 15
+    unspecified = TaggedUrn.from_string("cap:?a;?b;?c")       # 3 * 0 = 0
+    # mixed: a=x (4) + b (2) + !c (5) + ?d (0) = 11
+    mixed = TaggedUrn.from_string("cap:!c;?d;a=x;b")
 
-    assert exact.specificity() == 9
+    assert exact.specificity() == 12
     assert must_have.specificity() == 6
-    assert must_not.specificity() == 3
+    assert must_not.specificity() == 15
     assert unspecified.specificity() == 0
-    assert mixed.specificity() == 6
+    assert mixed.specificity() == 11
 
-    # Test specificity tuples
-    assert exact.specificity_tuple() == (3, 0, 0)
-    assert must_have.specificity_tuple() == (0, 3, 0)
-    assert must_not.specificity_tuple() == (0, 0, 3)
-    assert unspecified.specificity_tuple() == (0, 0, 0)
-    assert mixed.specificity_tuple() == (1, 1, 1)
+    # Five-tuple counts: (must_not_have, exact, present_not_value,
+    # must_have_any, absent_or_not_value).
+    assert exact.specificity_tuple() == (0, 3, 0, 0, 0)
+    assert must_have.specificity_tuple() == (0, 0, 0, 3, 0)
+    assert must_not.specificity_tuple() == (3, 0, 0, 0, 0)
+    assert unspecified.specificity_tuple() == (0, 0, 0, 0, 0)
+    assert mixed.specificity_tuple() == (1, 1, 0, 1, 0)
 
 
 # =========================================================================
@@ -1236,8 +1244,8 @@ def test_591_builder_single_tag():
 
     assert str(urn) == "cap:type=utility"
     assert urn.get_tag("type") == "utility"
-    # NEW GRADED SPECIFICITY: exact value = 3 points
-    assert urn.specificity() == 3
+    # Six-form ladder: exact value = 4 points.
+    assert urn.specificity() == 4
 
 
 # TEST592: Builder with complex multi-tag URN
@@ -1262,8 +1270,8 @@ def test_592_builder_complex():
     assert urn.get_tag("framerate") == "30fps"
     assert urn.get_tag("output") == "binary"
 
-    # GRADED SPECIFICITY: 7 exact-valued tags × 3 + 1 marker (transcode) × 2 = 21 + 2 = 23
-    assert urn.specificity() == 23
+    # Six-form ladder: 7 exact-valued tags × 4 + 1 marker (transcode) × 2 = 28 + 2 = 30.
+    assert urn.specificity() == 30
 
 
 # TEST593: Builder with wildcards
@@ -1324,7 +1332,7 @@ def test_595_builder_matching_with_built_urn():
     # Check specificity
     assert specific_instance.is_more_specific_than(general_pattern)
 
-    # NEW GRADED SPECIFICITY: exact value = 3 points, * = 2 points
-    assert specific_instance.specificity() == 9  # 3 exact values × 3 = 9
-    assert general_pattern.specificity() == 3  # 1 exact value × 3 = 3
-    assert wildcard_pattern.specificity() == 8  # 2 exact × 3 + 1 * × 2 = 6 + 2 = 8
+    # Six-form ladder: exact = 4 points, * (must-have-any) = 2 points.
+    assert specific_instance.specificity() == 12  # 3 exact × 4 = 12
+    assert general_pattern.specificity() == 4     # 1 exact × 4 = 4
+    assert wildcard_pattern.specificity() == 10   # 2 exact × 4 + 1 * × 2 = 8 + 2 = 10

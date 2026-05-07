@@ -8,6 +8,37 @@ from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
 
+def score_tag_value(value: str) -> int:
+    """Per-tag truth-table specificity score.
+
+    Applied uniformly to any stored tag value across the protocol —
+    media-URN tags, cap-tag y-axis, any other Tagged URN dimension.
+    Missing keys score 0; the caller filters them out before calling.
+
+    +--------------------+-------+----------------------+
+    | Stored value       | Score | Form                 |
+    +====================+=======+======================+
+    | ``"?"``            | 0     | ``?x`` no constraint |
+    | starts with ``?=`` | 1     | ``x?=v``             |
+    | ``"*"``            | 2     | ``x`` (``x=*``)      |
+    | starts with ``!=`` | 3     | ``x!=v``             |
+    | exact value        | 4     | ``x=v``              |
+    | ``"!"``            | 5     | ``!x``               |
+    +--------------------+-------+----------------------+
+    """
+    if value == "?":
+        return 0
+    if value == "*":
+        return 2
+    if value == "!":
+        return 5
+    if value.startswith("?="):
+        return 1
+    if value.startswith("!="):
+        return 3
+    return 4
+
+
 # Error classes
 class TaggedUrnError(Exception):
     """Base exception for tagged URN errors"""
@@ -78,14 +109,36 @@ class WhitespaceInInputError(TaggedUrnError):
 
 
 class ParseState(Enum):
-    """Parser states for the state machine"""
+    """Parser states for the state machine.
+
+    The parser handles six tag forms — the canonical alphabet of the
+    constraint truth table:
+
+    +-------------------------+-----------+--------------+-------+--------------------------------------------+
+    | Authored                | Canonical | Stored value | Score | Reading                                    |
+    +=========================+===========+==============+=======+============================================+
+    | ``?x`` ≡ ``x?``         | ``?x``    | ``"?"``      | 0     | no constraint                              |
+    | ``?x=v`` ≡ ``x?=v``     | ``x?=v``  | ``"?=v"``    | 1     | absent OR (present and not v)              |
+    | ``x`` ≡ ``x=*``         | ``x``     | ``"*"``      | 2     | present with any value                     |
+    | ``!x=v`` ≡ ``x!=v``     | ``x!=v``  | ``"!=v"``    | 3     | present and not v                          |
+    | ``x=v``                 | ``x=v``   | ``"v"``      | 4     | present and exactly v (v ∉ {?, !, *})      |
+    | ``!x`` ≡ ``x!``         | ``!x``    | ``"!"``      | 5     | absent (must-not-have)                     |
+    +-------------------------+-----------+--------------+-------+--------------------------------------------+
+
+    Disallowed (hard parse errors): ``?x?``, ``?x?=v``, ``!x!=v``,
+    ``?!x``, ``!?x``, ``?x=*``, ``!x=*``, mixed prefix+infix.
+    """
     EXPECTING_KEY = 1
-    IN_KEY = 2
-    EXPECTING_VALUE = 3
-    IN_UNQUOTED_VALUE = 4
-    IN_QUOTED_VALUE = 5
-    IN_QUOTED_VALUE_ESCAPE = 6
-    EXPECTING_SEMI_OR_END = 7
+    AFTER_PREFIX_QUESTION = 2
+    AFTER_PREFIX_BANG = 3
+    IN_KEY = 4
+    IN_KEY_AFTER_QUESTION = 5
+    IN_KEY_AFTER_BANG = 6
+    EXPECTING_VALUE = 7
+    IN_UNQUOTED_VALUE = 8
+    IN_QUOTED_VALUE = 9
+    IN_QUOTED_VALUE_ESCAPE = 10
+    EXPECTING_SEMI_OR_END = 11
 
 
 class TaggedUrn:
@@ -151,41 +204,109 @@ class TaggedUrn:
         state = ParseState.EXPECTING_KEY
         current_key = ""
         current_value = ""
+        # qualifier: None | '?' | '!' — tracked across the tag,
+        # reset on each finish_tag.
+        qualifier: Optional[str] = None
         chars = list(tags_part)
         pos = 0
+
+        def canonical_no_value(q: Optional[str]) -> str:
+            if q is None:
+                return "*"
+            if q == '?':
+                return "?"
+            if q == '!':
+                return "!"
+            raise AssertionError(f"invalid qualifier {q!r}")
+
+        def canonicalize_value(q: Optional[str], key: str, value: str) -> str:
+            if q is None:
+                return value
+            if value in ("*", "?", "!"):
+                raise InvalidCharacterError(
+                    f"qualifier '{q}' on key '{key}' cannot combine with sigil "
+                    f"value '{value}': use a real value or drop the qualifier"
+                )
+            return f"{q}={value}"
 
         while pos < len(chars):
             c = chars[pos]
 
             if state == ParseState.EXPECTING_KEY:
                 if c == ';':
-                    # Empty segment, skip
                     pos += 1
                     continue
+                elif c == '?':
+                    qualifier = '?'
+                    state = ParseState.AFTER_PREFIX_QUESTION
+                elif c == '!':
+                    qualifier = '!'
+                    state = ParseState.AFTER_PREFIX_BANG
                 elif cls._is_valid_key_char(c):
                     current_key += c.lower()
                     state = ParseState.IN_KEY
                 else:
                     raise InvalidCharacterError(f"invalid character '{c}' at position {pos}")
 
+            elif state in (ParseState.AFTER_PREFIX_QUESTION, ParseState.AFTER_PREFIX_BANG):
+                if cls._is_valid_key_char(c):
+                    current_key += c.lower()
+                    state = ParseState.IN_KEY
+                else:
+                    raise InvalidCharacterError(
+                        f"expected key character after '{qualifier}' qualifier, got '{c}' at position {pos}"
+                    )
+
             elif state == ParseState.IN_KEY:
                 if c == '=':
                     if not current_key:
                         raise EmptyTagComponentError("empty key")
                     state = ParseState.EXPECTING_VALUE
+                elif c == '?':
+                    if qualifier is not None:
+                        raise InvalidCharacterError(
+                            f"duplicate qualifier '?' at position {pos}: prefix and infix "
+                            f"qualifiers cannot be combined on key '{current_key}'"
+                        )
+                    qualifier = '?'
+                    state = ParseState.IN_KEY_AFTER_QUESTION
+                elif c == '!':
+                    if qualifier is not None:
+                        raise InvalidCharacterError(
+                            f"duplicate qualifier '!' at position {pos}: prefix and infix "
+                            f"qualifiers cannot be combined on key '{current_key}'"
+                        )
+                    qualifier = '!'
+                    state = ParseState.IN_KEY_AFTER_BANG
                 elif c == ';':
-                    # Value-less tag: treat as wildcard
                     if not current_key:
                         raise EmptyTagComponentError("empty key")
-                    current_value = "*"
+                    current_value = canonical_no_value(qualifier)
                     cls._finish_tag(tags, current_key, current_value)
                     current_key = ""
                     current_value = ""
+                    qualifier = None
                     state = ParseState.EXPECTING_KEY
                 elif cls._is_valid_key_char(c):
                     current_key += c.lower()
                 else:
                     raise InvalidCharacterError(f"invalid character '{c}' in key at position {pos}")
+
+            elif state in (ParseState.IN_KEY_AFTER_QUESTION, ParseState.IN_KEY_AFTER_BANG):
+                if c == '=':
+                    state = ParseState.EXPECTING_VALUE
+                elif c == ';':
+                    current_value = canonical_no_value(qualifier)
+                    cls._finish_tag(tags, current_key, current_value)
+                    current_key = ""
+                    current_value = ""
+                    qualifier = None
+                    state = ParseState.EXPECTING_KEY
+                else:
+                    raise InvalidCharacterError(
+                        f"expected '=' or ';' after '{current_key}{qualifier}' suffix qualifier, "
+                        f"got '{c}' at position {pos}"
+                    )
 
             elif state == ParseState.EXPECTING_VALUE:
                 if c == '"':
@@ -200,9 +321,11 @@ class TaggedUrn:
 
             elif state == ParseState.IN_UNQUOTED_VALUE:
                 if c == ';':
+                    current_value = canonicalize_value(qualifier, current_key, current_value)
                     cls._finish_tag(tags, current_key, current_value)
                     current_key = ""
                     current_value = ""
+                    qualifier = None
                     state = ParseState.EXPECTING_KEY
                 elif cls._is_valid_unquoted_value_char(c):
                     current_value += c.lower()
@@ -215,7 +338,6 @@ class TaggedUrn:
                 elif c == '\\':
                     state = ParseState.IN_QUOTED_VALUE_ESCAPE
                 else:
-                    # Any character allowed in quoted value, preserve case
                     current_value += c
 
             elif state == ParseState.IN_QUOTED_VALUE_ESCAPE:
@@ -223,32 +345,44 @@ class TaggedUrn:
                     current_value += c
                     state = ParseState.IN_QUOTED_VALUE
                 else:
-                    raise InvalidEscapeSequenceError(f"Invalid escape sequence at position {pos} (only \\\" and \\\\ allowed)")
+                    raise InvalidEscapeSequenceError(
+                        f"Invalid escape sequence at position {pos} (only \\\" and \\\\ allowed)"
+                    )
 
             elif state == ParseState.EXPECTING_SEMI_OR_END:
                 if c == ';':
+                    current_value = canonicalize_value(qualifier, current_key, current_value)
                     cls._finish_tag(tags, current_key, current_value)
                     current_key = ""
                     current_value = ""
+                    qualifier = None
                     state = ParseState.EXPECTING_KEY
                 else:
-                    raise InvalidCharacterError(f"expected ';' or end after quoted value, got '{c}' at position {pos}")
+                    raise InvalidCharacterError(
+                        f"expected ';' or end after quoted value, got '{c}' at position {pos}"
+                    )
 
             pos += 1
 
         # Handle end of input
         if state in (ParseState.IN_UNQUOTED_VALUE, ParseState.EXPECTING_SEMI_OR_END):
+            current_value = canonicalize_value(qualifier, current_key, current_value)
             cls._finish_tag(tags, current_key, current_value)
         elif state == ParseState.EXPECTING_KEY:
-            # Valid - trailing semicolon or empty input after prefix
             pass
         elif state in (ParseState.IN_QUOTED_VALUE, ParseState.IN_QUOTED_VALUE_ESCAPE):
             raise UnterminatedQuoteError(f"Unterminated quote at position {pos}")
+        elif state in (ParseState.AFTER_PREFIX_QUESTION, ParseState.AFTER_PREFIX_BANG):
+            raise EmptyTagComponentError(
+                f"qualifier '{qualifier}' at end of input has no key"
+            )
         elif state == ParseState.IN_KEY:
-            # Value-less tag at end: treat as wildcard
             if not current_key:
                 raise EmptyTagComponentError("empty key")
-            current_value = "*"
+            current_value = canonical_no_value(qualifier)
+            cls._finish_tag(tags, current_key, current_value)
+        elif state in (ParseState.IN_KEY_AFTER_QUESTION, ParseState.IN_KEY_AFTER_BANG):
+            current_value = canonical_no_value(qualifier)
             cls._finish_tag(tags, current_key, current_value)
         elif state == ParseState.EXPECTING_VALUE:
             raise EmptyTagComponentError(f"empty value for key '{current_key}'")
@@ -307,23 +441,42 @@ class TaggedUrn:
     def tags_to_string(self) -> str:
         """Serialize just the tags portion (without prefix)
 
-        Returns the tags in canonical form with proper quoting and sorting.
-        This is the portion after the ":" in a full URN string.
+        Returns the tags in canonical form with proper quoting and
+        sorting. Stored values map to emitted forms:
+
+        +--------------------+--------------+----------------------------+
+        | Stored value       | Emitted      | Form                       |
+        +====================+==============+============================+
+        | ``"*"``            | ``k``        | bare key (must-have-any)   |
+        | ``"?"``            | ``?k``       | prefix qualifier (no constraint) |
+        | ``"!"``            | ``!k``       | prefix qualifier (must-not-have) |
+        | ``"?=v"``          | ``k?=v``     | infix qualifier (absent or not v) |
+        | ``"!=v"``          | ``k!=v``     | infix qualifier (present and not v) |
+        | other ``v``        | ``k=v``      | exact value (with quoting if needed) |
+        +--------------------+--------------+----------------------------+
         """
-        # Sort keys for canonical form
         sorted_tags = sorted(self.tags.items())
 
         tags_str_list = []
         for k, v in sorted_tags:
             if v == "*":
-                # Valueless sugar: key
                 tags_str_list.append(k)
             elif v == "?":
-                # Explicit: key=?
-                tags_str_list.append(f"{k}=?")
+                tags_str_list.append(f"?{k}")
             elif v == "!":
-                # Explicit: key=!
-                tags_str_list.append(f"{k}=!")
+                tags_str_list.append(f"!{k}")
+            elif v.startswith("?="):
+                raw = v[2:]
+                if self._needs_quoting(raw):
+                    tags_str_list.append(f"{k}?={self._quote_value(raw)}")
+                else:
+                    tags_str_list.append(f"{k}?={raw}")
+            elif v.startswith("!="):
+                raw = v[2:]
+                if self._needs_quoting(raw):
+                    tags_str_list.append(f"{k}!={self._quote_value(raw)}")
+                else:
+                    tags_str_list.append(f"{k}!={raw}")
             elif self._needs_quoting(v):
                 tags_str_list.append(f"{k}={self._quote_value(v)}")
             else:
@@ -332,17 +485,7 @@ class TaggedUrn:
         return ";".join(tags_str_list)
 
     def to_string(self) -> str:
-        """Get the canonical string representation of this tagged URN
-
-        Uses the stored prefix
-        Tags are already sorted alphabetically due to dict ordering
-        No trailing semicolon in canonical form
-        Values are quoted only when necessary (smart quoting)
-        Special value serialization:
-        - `*` (must-have-any): serialized as value-less tag (just the key)
-        - `?` (unspecified): serialized as key=?
-        - `!` (must-not-have): serialized as key=!
-        """
+        """Get the canonical string representation of this tagged URN."""
         tags_str = self.tags_to_string()
         return f"{self.prefix}:{tags_str}"
 
@@ -446,74 +589,108 @@ class TaggedUrn:
 
         return True
 
+    # Form classification — used by _values_match and the
+    # specificity scorer.
+    _FORM_MISSING = 0
+    _FORM_NO_CONSTRAINT = 1   # "?"
+    _FORM_ABSENT_OR_NOT_VALUE = 2  # "?=v"
+    _FORM_MUST_HAVE_ANY = 3   # "*"
+    _FORM_PRESENT_NOT_VALUE = 4  # "!=v"
+    _FORM_EXACT = 5
+    _FORM_MUST_NOT_HAVE = 6   # "!"
+
+    @staticmethod
+    def _classify_form(value: Optional[str]) -> Tuple[int, str]:
+        """Classify a stored tag value into one of seven canonical
+        forms (six explicit + Missing). Returns (kind, raw value) —
+        raw is the inner v for ``?=v`` and ``!=v``, the literal
+        value for exact, and the empty string for sigil-only forms.
+        """
+        if value is None:
+            return (TaggedUrn._FORM_MISSING, "")
+        if value == "?":
+            return (TaggedUrn._FORM_NO_CONSTRAINT, "")
+        if value == "*":
+            return (TaggedUrn._FORM_MUST_HAVE_ANY, "")
+        if value == "!":
+            return (TaggedUrn._FORM_MUST_NOT_HAVE, "")
+        if value.startswith("?="):
+            return (TaggedUrn._FORM_ABSENT_OR_NOT_VALUE, value[2:])
+        if value.startswith("!="):
+            return (TaggedUrn._FORM_PRESENT_NOT_VALUE, value[2:])
+        return (TaggedUrn._FORM_EXACT, value)
+
     @staticmethod
     def _values_match(inst: Optional[str], patt: Optional[str]) -> bool:
-        """Check if instance value matches pattern constraint
+        """Check if instance value matches pattern constraint, per
+        the truth table over the six canonical forms (plus Missing).
 
-        Full cross-product truth table:
-        | Instance | Pattern | Match? | Reason |
-        |----------|---------|--------|--------|
-        | (none)   | (none)  | OK     | No constraint either side |
-        | (none)   | K=?     | OK     | Pattern doesn't care |
-        | (none)   | K=!     | OK     | Pattern wants absent, it is |
-        | (none)   | K=*     | NO     | Pattern wants present |
-        | (none)   | K=v     | NO     | Pattern wants exact value |
-        | K=?      | (any)   | OK     | Instance doesn't care |
-        | K=!      | (none)  | OK     | Symmetric: absent |
-        | K=!      | K=?     | OK     | Pattern doesn't care |
-        | K=!      | K=!     | OK     | Both want absent |
-        | K=!      | K=*     | NO     | Conflict: absent vs present |
-        | K=!      | K=v     | NO     | Conflict: absent vs value |
-        | K=*      | (none)  | OK     | Pattern has no constraint |
-        | K=*      | K=?     | OK     | Pattern doesn't care |
-        | K=*      | K=!     | NO     | Conflict: present vs absent |
-        | K=*      | K=*     | OK     | Both accept any presence |
-        | K=*      | K=v     | OK     | Instance accepts any, v is fine |
-        | K=v      | (none)  | OK     | Pattern has no constraint |
-        | K=v      | K=?     | OK     | Pattern doesn't care |
-        | K=v      | K=!     | NO     | Conflict: value vs absent |
-        | K=v      | K=*     | OK     | Pattern wants any, v satisfies |
-        | K=v      | K=v     | OK     | Exact match |
-        | K=v      | K=w     | NO     | Value mismatch (v≠w) |
+        See the canonical-form table in ``ParseState`` for the
+        encoding; see capdag/docs/04-PREDICATES.md §2.5 for the full
+        cross-product.
         """
-        # Pattern has no constraint (no entry or explicit ?)
-        if patt is None or patt == "?":
+        i_kind, i_val = TaggedUrn._classify_form(inst)
+        p_kind, p_val = TaggedUrn._classify_form(patt)
+
+        # Pattern unconditionally permissive.
+        if p_kind in (TaggedUrn._FORM_MISSING, TaggedUrn._FORM_NO_CONSTRAINT):
             return True
 
-        # Instance doesn't care (explicit ?)
-        if inst == "?":
+        # Instance unconditionally permissive.
+        if i_kind == TaggedUrn._FORM_NO_CONSTRAINT:
             return True
 
-        # Pattern: must-not-have (!)
-        if patt == "!":
-            if inst is None:
-                return True  # Instance absent, pattern wants absent
-            elif inst == "!":
-                return True  # Both say absent
-            else:
-                return False  # Instance has value, pattern wants absent
+        if p_kind == TaggedUrn._FORM_MUST_NOT_HAVE:
+            return i_kind in (
+                TaggedUrn._FORM_MISSING,
+                TaggedUrn._FORM_MUST_NOT_HAVE,
+                TaggedUrn._FORM_ABSENT_OR_NOT_VALUE,
+            )
 
-        # Instance: must-not-have conflicts with pattern wanting value
-        if inst == "!":
-            if patt == "*":
-                return False  # Conflict: absent vs present
-            else:
-                return False  # Conflict: absent vs value
+        if p_kind == TaggedUrn._FORM_MUST_HAVE_ANY:
+            return i_kind not in (
+                TaggedUrn._FORM_MISSING,
+                TaggedUrn._FORM_ABSENT_OR_NOT_VALUE,
+                TaggedUrn._FORM_MUST_NOT_HAVE,
+            )
 
-        # Pattern: must-have-any (*)
-        if patt == "*":
-            if inst is None:
-                return False  # Instance missing, pattern wants present
-            else:
-                return True  # Instance has value, pattern wants any
+        if p_kind == TaggedUrn._FORM_PRESENT_NOT_VALUE:
+            if i_kind in (
+                TaggedUrn._FORM_MISSING,
+                TaggedUrn._FORM_ABSENT_OR_NOT_VALUE,
+                TaggedUrn._FORM_MUST_NOT_HAVE,
+            ):
+                return False
+            if i_kind in (TaggedUrn._FORM_MUST_HAVE_ANY, TaggedUrn._FORM_PRESENT_NOT_VALUE):
+                return True  # defer
+            # Exact instance: pat requires not p_val, inst is i_val
+            return i_val != p_val
 
-        # Pattern: exact value
-        if inst is None:
-            return False  # Instance missing, pattern wants value
-        elif inst == "*":
-            return True  # Instance accepts any, pattern's value is fine
-        else:
-            return inst == patt  # Both have values, must match exactly
+        if p_kind == TaggedUrn._FORM_ABSENT_OR_NOT_VALUE:
+            if i_kind in (
+                TaggedUrn._FORM_MISSING,
+                TaggedUrn._FORM_ABSENT_OR_NOT_VALUE,
+                TaggedUrn._FORM_MUST_NOT_HAVE,
+            ):
+                return True
+            if i_kind in (TaggedUrn._FORM_MUST_HAVE_ANY, TaggedUrn._FORM_PRESENT_NOT_VALUE):
+                return True  # defer
+            # Exact instance vs pattern's "absent or not p"
+            return i_val != p_val
+
+        # p_kind == _FORM_EXACT
+        if i_kind in (
+            TaggedUrn._FORM_MISSING,
+            TaggedUrn._FORM_ABSENT_OR_NOT_VALUE,
+            TaggedUrn._FORM_MUST_NOT_HAVE,
+        ):
+            return False
+        if i_kind == TaggedUrn._FORM_MUST_HAVE_ANY:
+            return True  # defer
+        if i_kind == TaggedUrn._FORM_PRESENT_NOT_VALUE:
+            return i_val != p_val
+        # Exact vs Exact
+        return i_val == p_val
 
     def conforms_to_str(self, pattern_str: str) -> bool:
         """Check if this URN (instance) satisfies a string pattern's constraints."""
@@ -526,48 +703,44 @@ class TaggedUrn:
         return self.accepts(instance)
 
     def specificity(self) -> int:
-        """Calculate specificity score for URN matching
+        """Calculate specificity score for URN matching.
 
-        More specific URNs have higher scores and are preferred
-        Graded scoring:
-        - `K=v` (exact value): 3 points (most specific)
-        - `K=*` (must-have-any): 2 points
-        - `K=!` (must-not-have): 1 point
-        - `K=?` (unspecified): 0 points (least specific)
+        Sum of the per-tag truth-table score across every tag. See
+        :func:`score_tag_value` for the per-tag ladder.
         """
-        score = 0
-        for v in self.tags.values():
-            if v == "?":
-                score += 0
-            elif v == "!":
-                score += 1
-            elif v == "*":
-                score += 2
-            else:
-                score += 3  # exact value
-        return score
+        return sum(score_tag_value(v) for v in self.tags.values())
 
-    def specificity_tuple(self) -> Tuple[int, int, int]:
-        """Get specificity as a tuple for tie-breaking
+    def specificity_tuple(self) -> Tuple[int, int, int, int, int]:
+        """Get specificity as a tuple for tie-breaking.
 
-        Returns (exact_count, must_have_any_count, must_not_count)
-        Compare tuples lexicographically when sum scores are equal
+        Counts how many tags fall into each non-zero form bucket,
+        ordered from highest score to lowest:
+
+            (must_not_have, exact, present_not_value, must_have_any, absent_or_not_value)
+
+        Compare tuples lexicographically when sum scores are equal.
         """
+        must_not_have = 0
         exact = 0
+        present_not_value = 0
         must_have_any = 0
-        must_not = 0
+        absent_or_not_value = 0
 
         for v in self.tags.values():
-            if v == "?":
-                pass
-            elif v == "!":
-                must_not += 1
-            elif v == "*":
-                must_have_any += 1
-            else:
+            kind, _ = TaggedUrn._classify_form(v)
+            if kind == TaggedUrn._FORM_MUST_NOT_HAVE:
+                must_not_have += 1
+            elif kind == TaggedUrn._FORM_EXACT:
                 exact += 1
+            elif kind == TaggedUrn._FORM_PRESENT_NOT_VALUE:
+                present_not_value += 1
+            elif kind == TaggedUrn._FORM_MUST_HAVE_ANY:
+                must_have_any += 1
+            elif kind == TaggedUrn._FORM_ABSENT_OR_NOT_VALUE:
+                absent_or_not_value += 1
+            # _FORM_NO_CONSTRAINT and _FORM_MISSING contribute nothing
 
-        return (exact, must_have_any, must_not)
+        return (must_not_have, exact, present_not_value, must_have_any, absent_or_not_value)
 
     def is_more_specific_than(self, other: 'TaggedUrn') -> bool:
         """Check if this URN is more specific than another"""
