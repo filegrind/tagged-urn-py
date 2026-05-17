@@ -45,6 +45,31 @@ class TaggedUrnError(Exception):
     pass
 
 
+class TaggedUrnRelationKind(Enum):
+    EQUIVALENT = "equivalent"
+    COMPARABLE = "comparable"
+    INCOMPARABLE = "incomparable"
+
+
+class TaggedUrnCoordinateDelta:
+    """Coordinate-space edit from one tagged URN to another with the same prefix."""
+
+    def __init__(
+        self,
+        prefix: str,
+        removed: Optional[Dict[str, str]] = None,
+        added: Optional[Dict[str, str]] = None,
+        relation_kind: TaggedUrnRelationKind = TaggedUrnRelationKind.EQUIVALENT,
+    ):
+        self.prefix = prefix
+        self.removed = dict(removed or {})
+        self.added = dict(added or {})
+        self.relation_kind = relation_kind
+
+    def is_empty(self) -> bool:
+        return not self.removed and not self.added
+
+
 class EmptyError(TaggedUrnError):
     """Empty or malformed URN"""
     pass
@@ -801,6 +826,48 @@ class TaggedUrn:
         """String variant of `is_comparable`."""
         other = TaggedUrn.from_string(other_str)
         return self.is_comparable(other)
+
+    def delta_from(self, base: "TaggedUrn") -> TaggedUrnCoordinateDelta:
+        """Compute the coordinate-space delta from ``base`` to ``self``."""
+        if base is None:
+            raise TaggedUrnError("cannot derive delta from null URN")
+        if self.prefix != base.prefix:
+            raise PrefixMismatchError(base.prefix, self.prefix)
+
+        if self.is_equivalent(base):
+            relation_kind = TaggedUrnRelationKind.EQUIVALENT
+        elif self.is_comparable(base):
+            relation_kind = TaggedUrnRelationKind.COMPARABLE
+        else:
+            relation_kind = TaggedUrnRelationKind.INCOMPARABLE
+
+        removed: Dict[str, str] = {}
+        added: Dict[str, str] = {}
+        all_keys = set(base.tags.keys()) | set(self.tags.keys())
+        for key in all_keys:
+            base_value = base.tags.get(key)
+            target_value = self.tags.get(key)
+            if base_value == target_value:
+                continue
+            if base_value is not None:
+                removed[key] = base_value
+            if target_value is not None:
+                added[key] = target_value
+
+        return TaggedUrnCoordinateDelta(self.prefix, removed, added, relation_kind)
+
+    def apply_delta(self, delta: TaggedUrnCoordinateDelta) -> "TaggedUrn":
+        """Apply a coordinate-space delta to this tagged URN."""
+        if delta is None:
+            raise TaggedUrnError("cannot apply null delta")
+        if self.prefix != delta.prefix:
+            raise PrefixMismatchError(delta.prefix, self.prefix)
+
+        next_tags = self.tags.copy()
+        for key in delta.removed:
+            next_tags.pop(key, None)
+        next_tags.update(delta.added)
+        return TaggedUrn(self.prefix, next_tags)
 
     def with_wildcard_tag(self, key: str) -> 'TaggedUrn':
         """Create a wildcard version by replacing specific values with wildcards"""
