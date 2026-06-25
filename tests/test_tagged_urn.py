@@ -2,7 +2,8 @@ import pytest
 from tagged_urn import TaggedUrn, TaggedUrnBuilder, UrnMatcher, TaggedUrnError
 
 
-def test_tagged_urn_creation():
+# TEST0001: Tagged urn creation
+def test_0001_tagged_urn_creation():
     urn = TaggedUrn.from_string("cap:generate;ext=pdf;target=thumbnail;")
     assert urn.get_prefix() == "cap"
     assert urn.has_marker_tag("generate")
@@ -10,14 +11,16 @@ def test_tagged_urn_creation():
     assert urn.get_tag("ext") == "pdf"
 
 
-def test_custom_prefix():
+# TEST0002: Custom prefix
+def test_0002_custom_prefix():
     urn = TaggedUrn.from_string("myapp:generate;ext=pdf")
     assert urn.get_prefix() == "myapp"
     assert urn.has_marker_tag("generate")
     assert str(urn) == "myapp:ext=pdf;generate"
 
 
-def test_prefix_case_insensitive():
+# TEST0003: Prefix case insensitive
+def test_0003_prefix_case_insensitive():
     urn1 = TaggedUrn.from_string("CAP:test")
     urn2 = TaggedUrn.from_string("cap:test")
     urn3 = TaggedUrn.from_string("Cap:test")
@@ -29,7 +32,8 @@ def test_prefix_case_insensitive():
     assert urn2 == urn3
 
 
-def test_prefix_mismatch_error():
+# TEST0004: Prefix mismatch error
+def test_0004_prefix_mismatch_error():
     urn1 = TaggedUrn.from_string("cap:test")
     urn2 = TaggedUrn.from_string("myapp:test")
 
@@ -39,14 +43,16 @@ def test_prefix_mismatch_error():
     assert exc_info.value.actual == "myapp"
 
 
-def test_builder_with_prefix():
+# TEST0005: Builder with prefix
+def test_0005_builder_with_prefix():
     urn = TaggedUrnBuilder("custom").tag("key", "value").build()
 
     assert urn.get_prefix() == "custom"
     assert str(urn) == "custom:key=value"
 
 
-def test_unquoted_values_lowercased():
+# TEST0006: Unquoted values lowercased
+def test_0006_unquoted_values_lowercased():
     # Unquoted values are normalized to lowercase
     urn = TaggedUrn.from_string("cap:ext=pdf;generate;target=thumbnail;")
 
@@ -66,7 +72,8 @@ def test_unquoted_values_lowercased():
     assert urn == urn2
 
 
-def test_quoted_values_preserve_case():
+# TEST0007: Quoted values preserve case
+def test_0007_quoted_values_preserve_case():
     # Quoted values preserve their case
     urn = TaggedUrn.from_string(r'cap:key="Value With Spaces"')
     assert urn.get_tag("key") == "Value With Spaces"
@@ -83,7 +90,8 @@ def test_quoted_values_preserve_case():
     assert unquoted != quoted  # NOT equal
 
 
-def test_quoted_value_special_chars():
+# TEST0008: Quoted value special chars
+def test_0008_quoted_value_special_chars():
     # Semicolons in quoted values
     urn = TaggedUrn.from_string(r'cap:key="value;with;semicolons"')
     assert urn.get_tag("key") == "value;with;semicolons"
@@ -97,7 +105,8 @@ def test_quoted_value_special_chars():
     assert urn3.get_tag("key") == "hello world"
 
 
-def test_quoted_value_escape_sequences():
+# TEST0009: Quoted value escape sequences
+def test_0009_quoted_value_escape_sequences():
     # Escaped quotes
     urn = TaggedUrn.from_string(r'cap:key="value\"quoted\""')
     assert urn.get_tag("key") == r'value"quoted"'
@@ -111,18 +120,21 @@ def test_quoted_value_escape_sequences():
     assert urn3.get_tag("key") == r'say "hello\world"'
 
 
-def test_mixed_quoted_unquoted():
+# TEST0010: Mixed quoted unquoted
+def test_0010_mixed_quoted_unquoted():
     urn = TaggedUrn.from_string(r'cap:a="Quoted";b=simple')
     assert urn.get_tag("a") == "Quoted"
     assert urn.get_tag("b") == "simple"
 
 
-def test_unterminated_quote_error():
+# TEST0011: Unterminated quote error
+def test_0011_unterminated_quote_error():
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string(r'cap:key="unterminated')
 
 
-def test_invalid_escape_sequence_error():
+# TEST0012: Invalid escape sequence error
+def test_0012_invalid_escape_sequence_error():
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string(r'cap:key="bad\n"')
 
@@ -131,7 +143,8 @@ def test_invalid_escape_sequence_error():
         TaggedUrn.from_string(r'cap:key="bad\x"')
 
 
-def test_serialization_smart_quoting():
+# TEST0013: Serialization smart quoting
+def test_0013_serialization_smart_quoting():
     # Simple lowercase value - no quoting needed
     urn = TaggedUrnBuilder("cap").tag("key", "simple").build()
     assert str(urn) == "cap:key=simple"
@@ -157,7 +170,8 @@ def test_serialization_smart_quoting():
     assert str(urn6) == r'cap:key="path\\file"'
 
 
-def test_round_trip_simple():
+# TEST0014: Round trip simple
+def test_0014_round_trip_simple():
     original = "cap:generate;ext=pdf"
     urn = TaggedUrn.from_string(original)
     serialized = str(urn)
@@ -165,7 +179,8 @@ def test_round_trip_simple():
     assert urn == reparsed
 
 
-def test_round_trip_quoted():
+# TEST0015: Round trip quoted
+def test_0015_round_trip_quoted():
     original = r'cap:key="Value With Spaces"'
     urn = TaggedUrn.from_string(original)
     serialized = str(urn)
@@ -174,7 +189,8 @@ def test_round_trip_quoted():
     assert reparsed.get_tag("key") == "Value With Spaces"
 
 
-def test_round_trip_escapes():
+# TEST0016: Round trip escapes
+def test_0016_round_trip_escapes():
     original = r'cap:key="value\"with\\escapes"'
     urn = TaggedUrn.from_string(original)
     assert urn.get_tag("key") == r'value"with\escapes'
@@ -183,7 +199,8 @@ def test_round_trip_escapes():
     assert urn == reparsed
 
 
-def test_prefix_required():
+# TEST0017: Prefix required
+def test_0017_prefix_required():
     # Missing prefix should fail
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("generate;ext=pdf")
@@ -197,7 +214,8 @@ def test_prefix_required():
     assert urn2.has_marker_tag("generate")
 
 
-def test_trailing_semicolon_equivalence():
+# TEST0018: Trailing semicolon equivalence
+def test_0018_trailing_semicolon_equivalence():
     # Both with and without trailing semicolon should be equivalent
     urn1 = TaggedUrn.from_string("cap:generate;ext=pdf")
     urn2 = TaggedUrn.from_string("cap:generate;ext=pdf;")
@@ -216,14 +234,16 @@ def test_trailing_semicolon_equivalence():
     assert urn2.conforms_to(urn1)
 
 
-def test_canonical_string_format():
+# TEST0019: Canonical string format
+def test_0019_canonical_string_format():
     urn = TaggedUrn.from_string("cap:generate;target=thumbnail;ext=pdf")
     # Should be sorted alphabetically and have no trailing semicolon in canonical form
     # Alphabetical order: ext < op < target
     assert str(urn) == "cap:ext=pdf;generate;target=thumbnail"
 
 
-def test_tag_matching():
+# TEST0020: Tag matching
+def test_0020_tag_matching():
     urn = TaggedUrn.from_string("cap:generate;ext=pdf;target=thumbnail;")
 
     # Exact match
@@ -243,7 +263,8 @@ def test_tag_matching():
     assert not urn.conforms_to(request4)
 
 
-def test_matching_case_sensitive_values():
+# TEST0021: Matching case sensitive values
+def test_0021_matching_case_sensitive_values():
     # Values with different case should NOT match
     urn1 = TaggedUrn.from_string(r'cap:key="Value"')
     urn2 = TaggedUrn.from_string(r'cap:key="value"')
@@ -255,7 +276,8 @@ def test_matching_case_sensitive_values():
     assert urn1.conforms_to(urn3)
 
 
-def test_missing_tag_handling():
+# TEST0022: Missing tag handling
+def test_0022_missing_tag_handling():
     # NEW SEMANTICS: Missing tag in instance means the tag doesn't exist.
     # Pattern constraints must be satisfied by instance.
 
@@ -281,7 +303,8 @@ def test_missing_tag_handling():
     assert not urn.conforms_to(pattern4)  # Instance missing ext, pattern requires ext to be present
 
 
-def test_specificity():
+# TEST0023: Specificity
+def test_0023_specificity():
     # Six-form per-tag specificity ladder:
     #   ?x        : 0  (no constraint)
     #   x?=v      : 1  (absent OR not v)
@@ -315,7 +338,8 @@ def test_specificity():
     assert urn2.is_more_specific_than(urn1)  # exact(4) > marker(2)
 
 
-def test_builder():
+# TEST0024: Builder
+def test_0024_builder():
     urn = (TaggedUrnBuilder("cap")
            .marker("generate")
            .tag("target", "thumbnail")
@@ -327,7 +351,8 @@ def test_builder():
     assert urn.get_tag("output") == "binary"
 
 
-def test_builder_preserves_case():
+# TEST0025: Builder preserves case
+def test_0025_builder_preserves_case():
     urn = TaggedUrnBuilder("cap").tag("KEY", "ValueWithCase").build()
 
     # Key is lowercase
@@ -336,7 +361,8 @@ def test_builder_preserves_case():
     assert str(urn) == r'cap:key="ValueWithCase"'
 
 
-def test_compatibility():
+# TEST0026: Compatibility
+def test_0026_compatibility():
     # TEST526: Test directional accepts between general and specific URNs
     general = TaggedUrn.from_string("cap:generate")
     specific = TaggedUrn.from_string("cap:generate;ext=pdf")
@@ -358,7 +384,8 @@ def test_compatibility():
     assert not urn_format.accepts(general)
 
 
-def test_best_match():
+# TEST0027: Best match
+def test_0027_best_match():
     urns = [
         TaggedUrn.from_string("cap:op"),
         TaggedUrn.from_string("cap:generate"),
@@ -373,7 +400,8 @@ def test_best_match():
     assert str(best) == "cap:ext=pdf;generate"
 
 
-def test_merge_and_subset():
+# TEST0028: Merge and subset
+def test_0028_merge_and_subset():
     urn1 = TaggedUrn.from_string("cap:generate")
     urn2 = TaggedUrn.from_string("cap:ext=pdf;output=binary")
 
@@ -385,7 +413,8 @@ def test_merge_and_subset():
     assert str(subset) == "cap:ext=pdf"
 
 
-def test_merge_prefix_mismatch():
+# TEST0029: Merge prefix mismatch
+def test_0029_merge_prefix_mismatch():
     urn1 = TaggedUrn.from_string("cap:generate")
     urn2 = TaggedUrn.from_string("myapp:ext=pdf")
 
@@ -393,7 +422,8 @@ def test_merge_prefix_mismatch():
         urn1.merge(urn2)
 
 
-def test_wildcard_tag():
+# TEST0030: Wildcard tag
+def test_0030_wildcard_tag():
     urn = TaggedUrn.from_string("cap:ext=pdf")
     wildcarded = urn.with_wildcard_tag("ext")
 
@@ -406,7 +436,8 @@ def test_wildcard_tag():
     assert wildcarded.conforms_to(TaggedUrn.from_string("cap:ext"))
 
 
-def test_empty_tagged_urn():
+# TEST0031: Empty tagged urn
+def test_0031_empty_tagged_urn():
     # Empty tagged URN is valid
     empty_urn = TaggedUrn.from_string("cap:")
     assert len(empty_urn.tags) == 0
@@ -434,21 +465,24 @@ def test_empty_tagged_urn():
     assert len(empty_urn2.tags) == 0
 
 
-def test_empty_with_custom_prefix():
+# TEST0032: Empty with custom prefix
+def test_0032_empty_with_custom_prefix():
     empty_urn = TaggedUrn.from_string("myapp:")
     assert empty_urn.get_prefix() == "myapp"
     assert len(empty_urn.tags) == 0
     assert str(empty_urn) == "myapp:"
 
 
-def test_extended_character_support():
+# TEST0033: Extended character support
+def test_0033_extended_character_support():
     # Test forward slashes and colons in tag components
     urn = TaggedUrn.from_string("cap:url=https://example_org/api;path=/some/file")
     assert urn.get_tag("url") == "https://example_org/api"
     assert urn.get_tag("path") == "/some/file"
 
 
-def test_wildcard_restrictions():
+# TEST0034: Wildcard restrictions
+def test_0034_wildcard_restrictions():
     # Wildcard should be rejected in keys
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:*=value")
@@ -458,12 +492,14 @@ def test_wildcard_restrictions():
     assert urn.get_tag("key") == "*"
 
 
-def test_duplicate_key_rejection():
+# TEST0035: Duplicate key rejection
+def test_0035_duplicate_key_rejection():
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:key=value1;key=value2")
 
 
-def test_numeric_key_restriction():
+# TEST0036: Numeric key restriction
+def test_0036_numeric_key_restriction():
     # Pure numeric keys should be rejected
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:123=value")
@@ -476,14 +512,16 @@ def test_numeric_key_restriction():
     assert TaggedUrn.from_string("cap:key=123")
 
 
-def test_empty_value_error():
+# TEST0037: Empty value error
+def test_0037_empty_value_error():
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:key=")
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:key=;other=value")
 
 
-def test_has_tag_case_sensitive():
+# TEST0038: Has tag case sensitive
+def test_0038_has_tag_case_sensitive():
     urn = TaggedUrn.from_string(r'cap:key="Value"')
 
     # Exact case match works
@@ -498,24 +536,28 @@ def test_has_tag_case_sensitive():
     assert urn.has_tag("Key", "Value")
 
 
-def test_with_tag_preserves_value():
+# TEST0039: With tag preserves value
+def test_0039_with_tag_preserves_value():
     urn = TaggedUrn.empty("cap").with_tag("key", "ValueWithCase")
     assert urn.get_tag("key") == "ValueWithCase"
 
 
-def test_with_tag_rejects_empty_value():
+# TEST0040: With tag rejects empty value
+def test_0040_with_tag_rejects_empty_value():
     with pytest.raises(TaggedUrnError) as exc_info:
         TaggedUrn.empty("cap").with_tag("key", "")
     assert "empty value" in str(exc_info.value).lower()
 
 
-def test_builder_rejects_empty_value():
+# TEST0041: Builder rejects empty value
+def test_0041_builder_rejects_empty_value():
     with pytest.raises(TaggedUrnError) as exc_info:
         TaggedUrnBuilder("cap").tag("key", "")
     assert "empty value" in str(exc_info.value).lower()
 
 
-def test_semantic_equivalence():
+# TEST0042: Semantic equivalence
+def test_0042_semantic_equivalence():
     # Unquoted and quoted simple lowercase values are equivalent
     unquoted = TaggedUrn.from_string("cap:key=simple")
     quoted = TaggedUrn.from_string(r'cap:key="simple"')
@@ -532,7 +574,7 @@ def test_semantic_equivalence():
 # All implementations (Rust, Go, JS, ObjC) must pass these identically
 # ============================================================================
 
-def test_matching_semantics_test1_exact_match():
+def test_0043_matching_semantics_test1_exact_match():
     # Test 1: Exact match
     # URN:     cap:generate;ext=pdf
     # Request: cap:generate;ext=pdf
@@ -542,7 +584,8 @@ def test_matching_semantics_test1_exact_match():
     assert urn.conforms_to(request), "Test 1: Exact match should succeed"
 
 
-def test_matching_semantics_test2_instance_missing_tag():
+# TEST0044: Matching semantics test2 instance missing tag
+def test_0044_matching_semantics_test2_instance_missing_tag():
     # Test 2: Instance missing tag
     # Instance: cap:generate;in=media:;out=media:
     # Pattern:  cap:generate;ext=pdf
@@ -559,7 +602,8 @@ def test_matching_semantics_test2_instance_missing_tag():
     assert instance.conforms_to(pattern_optional), "Pattern with ext=? should match instance without ext"
 
 
-def test_matching_semantics_test3_urn_has_extra_tag():
+# TEST0045: Matching semantics test3 urn has extra tag
+def test_0045_matching_semantics_test3_urn_has_extra_tag():
     # Test 3: URN has extra tag
     # URN:     cap:generate;ext=pdf;version=2
     # Request: cap:generate;ext=pdf
@@ -569,7 +613,8 @@ def test_matching_semantics_test3_urn_has_extra_tag():
     assert urn.conforms_to(request), "Test 3: URN with extra tag should match"
 
 
-def test_matching_semantics_test4_request_has_wildcard():
+# TEST0046: Matching semantics test4 request has wildcard
+def test_0046_matching_semantics_test4_request_has_wildcard():
     # Test 4: Request has wildcard
     # URN:     cap:generate;ext=pdf
     # Request: cap:generate;ext=*
@@ -579,7 +624,8 @@ def test_matching_semantics_test4_request_has_wildcard():
     assert urn.conforms_to(request), "Test 4: Request wildcard should match"
 
 
-def test_matching_semantics_test5_urn_has_wildcard():
+# TEST0047: Matching semantics test5 urn has wildcard
+def test_0047_matching_semantics_test5_urn_has_wildcard():
     # Test 5: URN has wildcard
     # URN:     cap:generate;ext=*
     # Request: cap:generate;ext=pdf
@@ -589,7 +635,8 @@ def test_matching_semantics_test5_urn_has_wildcard():
     assert urn.conforms_to(request), "Test 5: URN wildcard should match"
 
 
-def test_matching_semantics_test6_value_mismatch():
+# TEST0048: Matching semantics test6 value mismatch
+def test_0048_matching_semantics_test6_value_mismatch():
     # Test 6: Value mismatch
     # URN:     cap:generate;ext=pdf
     # Request: cap:generate;ext=docx
@@ -599,7 +646,8 @@ def test_matching_semantics_test6_value_mismatch():
     assert not urn.conforms_to(request), "Test 6: Value mismatch should not match"
 
 
-def test_matching_semantics_test7_pattern_has_extra_tag():
+# TEST0049: Matching semantics test7 pattern has extra tag
+def test_0049_matching_semantics_test7_pattern_has_extra_tag():
     # Test 7: Pattern has extra tag that instance doesn't have
     # Instance: cap:generate-thumbnail;out="media:binary"
     # Pattern:  cap:generate-thumbnail;out="media:binary";ext=wav
@@ -615,7 +663,8 @@ def test_matching_semantics_test7_pattern_has_extra_tag():
     assert instance.conforms_to(pattern_no_ext)
 
 
-def test_matching_semantics_test8_empty_pattern_matches_anything():
+# TEST0050: Matching semantics test8 empty pattern matches anything
+def test_0050_matching_semantics_test8_empty_pattern_matches_anything():
     # Test 8: Empty PATTERN matches any INSTANCE
     # Instance: cap:generate;ext=pdf
     # Pattern:  cap:
@@ -633,7 +682,8 @@ def test_matching_semantics_test8_empty_pattern_matches_anything():
     assert not empty_instance.conforms_to(pattern), "Empty instance should NOT match pattern with requirements"
 
 
-def test_matching_semantics_test9_cross_dimension_constraints():
+# TEST0051: Matching semantics test9 cross dimension constraints
+def test_0051_matching_semantics_test9_cross_dimension_constraints():
     # Test 9: Cross-dimension constraints
     # Instance: cap:generate;in=media:;out=media:
     # Pattern:  cap:ext=pdf
@@ -650,7 +700,8 @@ def test_matching_semantics_test9_cross_dimension_constraints():
     assert instance2.conforms_to(pattern2), "Instance with ext=pdf should match pattern requiring ext=pdf"
 
 
-def test_matching_different_prefixes_error():
+# TEST0052: Matching different prefixes error
+def test_0052_matching_different_prefixes_error():
     # URNs with different prefixes should cause an error, not just return false
     urn1 = TaggedUrn.from_string("cap:test")
     urn2 = TaggedUrn.from_string("other:test")
@@ -670,7 +721,7 @@ def test_matching_different_prefixes_error():
 # Value-less tags are equivalent to wildcard tags (key=*)
 # ============================================================================
 
-def test_valueless_tag_parsing_single():
+def test_0053_valueless_tag_parsing_single():
     # Single value-less tag
     urn = TaggedUrn.from_string("cap:optimize")
     assert urn.get_tag("optimize") == "*"
@@ -678,7 +729,8 @@ def test_valueless_tag_parsing_single():
     assert str(urn) == "cap:optimize"
 
 
-def test_valueless_tag_parsing_multiple():
+# TEST0054: Valueless tag parsing multiple
+def test_0054_valueless_tag_parsing_multiple():
     # Multiple value-less tags
     urn = TaggedUrn.from_string("cap:fast;optimize;secure")
     assert urn.get_tag("fast") == "*"
@@ -688,7 +740,8 @@ def test_valueless_tag_parsing_multiple():
     assert str(urn) == "cap:fast;optimize;secure"
 
 
-def test_valueless_tag_mixed_with_valued():
+# TEST0055: Valueless tag mixed with valued
+def test_0055_valueless_tag_mixed_with_valued():
     # Mix of value-less and valued tags
     urn = TaggedUrn.from_string("cap:generate;optimize;ext=pdf;secure")
     assert urn.has_marker_tag("generate")
@@ -699,7 +752,8 @@ def test_valueless_tag_mixed_with_valued():
     assert str(urn) == "cap:ext=pdf;generate;optimize;secure"
 
 
-def test_valueless_tag_at_end():
+# TEST0056: Valueless tag at end
+def test_0056_valueless_tag_at_end():
     # Value-less tag at the end (no trailing semicolon)
     urn = TaggedUrn.from_string("cap:generate;optimize")
     assert urn.has_marker_tag("generate")
@@ -707,7 +761,8 @@ def test_valueless_tag_at_end():
     assert str(urn) == "cap:generate;optimize"
 
 
-def test_valueless_tag_equivalence_to_wildcard():
+# TEST0057: Valueless tag equivalence to wildcard
+def test_0057_valueless_tag_equivalence_to_wildcard():
     # Value-less tag is equivalent to explicit wildcard
     valueless = TaggedUrn.from_string("cap:ext")
     wildcard = TaggedUrn.from_string("cap:ext=*")
@@ -717,7 +772,8 @@ def test_valueless_tag_equivalence_to_wildcard():
     assert str(wildcard) == "cap:ext"
 
 
-def test_valueless_tag_matching():
+# TEST0058: Valueless tag matching
+def test_0058_valueless_tag_matching():
     # Value-less tag (wildcard) matches any value
     urn = TaggedUrn.from_string("cap:generate;ext")
 
@@ -730,7 +786,8 @@ def test_valueless_tag_matching():
     assert urn.conforms_to(request_any)
 
 
-def test_valueless_tag_in_pattern():
+# TEST0059: Valueless tag in pattern
+def test_0059_valueless_tag_in_pattern():
     # Pattern with value-less tag (K=*) requires instance to have the tag
     pattern = TaggedUrn.from_string("cap:generate;ext")
 
@@ -748,7 +805,8 @@ def test_valueless_tag_in_pattern():
     assert instance_missing.conforms_to(pattern_optional)
 
 
-def test_valueless_tag_specificity():
+# TEST0060: Valueless tag specificity
+def test_0060_valueless_tag_specificity():
     # Six-form ladder: ?x=0, x?=v=1, x=*=2, x!=v=3, x=v=4, !x=5.
     urn1 = TaggedUrn.from_string("cap:generate")          # 1 marker
     urn2 = TaggedUrn.from_string("cap:generate;optimize") # 2 markers
@@ -759,7 +817,8 @@ def test_valueless_tag_specificity():
     assert urn3.specificity() == 6  # 1 marker + 1 exact = 2 + 4 = 6
 
 
-def test_valueless_tag_roundtrip():
+# TEST0061: Valueless tag roundtrip
+def test_0061_valueless_tag_roundtrip():
     # Round-trip parsing and serialization
     original = "cap:ext=pdf;generate;optimize;secure"
     urn = TaggedUrn.from_string(original)
@@ -769,7 +828,8 @@ def test_valueless_tag_roundtrip():
     assert serialized == original
 
 
-def test_valueless_tag_case_normalization():
+# TEST0062: Valueless tag case normalization
+def test_0062_valueless_tag_case_normalization():
     # Value-less tags are normalized to lowercase like other keys
     urn = TaggedUrn.from_string("cap:OPTIMIZE;Fast;SECURE")
     assert urn.get_tag("optimize") == "*"
@@ -778,7 +838,8 @@ def test_valueless_tag_case_normalization():
     assert str(urn) == "cap:fast;optimize;secure"
 
 
-def test_empty_value_still_error():
+# TEST0063: Empty value still error
+def test_0063_empty_value_still_error():
     # Empty value with = is still an error (different from value-less)
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:key=")
@@ -786,7 +847,8 @@ def test_empty_value_still_error():
         TaggedUrn.from_string("cap:key=;other=value")
 
 
-def test_valueless_tag_compatibility():
+# TEST0064: Valueless tag compatibility
+def test_0064_valueless_tag_compatibility():
     # TEST564: Value-less tags (wildcard) accept any specific value
     urn_wildcard = TaggedUrn.from_string("cap:generate;ext")  # ext=*
     urn_pdf = TaggedUrn.from_string("cap:generate;ext=pdf")
@@ -803,7 +865,8 @@ def test_valueless_tag_compatibility():
     assert not urn_docx.accepts(urn_pdf)
 
 
-def test_valueless_numeric_key_still_rejected():
+# TEST0065: Valueless numeric key still rejected
+def test_0065_valueless_numeric_key_still_rejected():
     # Purely numeric keys are still rejected for value-less tags
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string("cap:123")
@@ -811,7 +874,8 @@ def test_valueless_numeric_key_still_rejected():
         TaggedUrn.from_string("cap:generate;456")
 
 
-def test_whitespace_in_input_rejected():
+# TEST0066: Whitespace in input rejected
+def test_0066_whitespace_in_input_rejected():
     # Leading whitespace fails hard
     with pytest.raises(TaggedUrnError):
         TaggedUrn.from_string(" cap:test")
@@ -838,7 +902,7 @@ def test_whitespace_in_input_rejected():
 # NEW SEMANTICS TESTS: ? (unspecified) and ! (must-not-have)
 # ============================================================================
 
-def test_unspecified_question_mark_parsing():
+def test_0067_unspecified_question_mark_parsing():
     # All three input aliases (?x, x?, x=?) parse to stored value "?"
     # and serialize as the canonical prefix form `?x`.
     urn = TaggedUrn.from_string("cap:ext=?")
@@ -846,7 +910,8 @@ def test_unspecified_question_mark_parsing():
     assert str(urn) == "cap:?ext"
 
 
-def test_must_not_have_exclamation_parsing():
+# TEST0068: Must not have exclamation parsing
+def test_0068_must_not_have_exclamation_parsing():
     # All three input aliases (!x, x!, x=!) parse to stored value "!"
     # and serialize as the canonical prefix form `!x`.
     urn = TaggedUrn.from_string("cap:ext=!")
@@ -854,7 +919,8 @@ def test_must_not_have_exclamation_parsing():
     assert str(urn) == "cap:!ext"
 
 
-def test_question_mark_pattern_matches_anything():
+# TEST0069: Question mark pattern matches anything
+def test_0069_question_mark_pattern_matches_anything():
     # Pattern with K=? matches any instance (with or without K)
     pattern = TaggedUrn.from_string("cap:ext=?")
 
@@ -871,7 +937,8 @@ def test_question_mark_pattern_matches_anything():
     assert instance_must_not.conforms_to(pattern), "ext=! should match ext=?"
 
 
-def test_question_mark_in_instance():
+# TEST0070: Question mark in instance
+def test_0070_question_mark_in_instance():
     # Instance with K=? matches any pattern constraint
     instance = TaggedUrn.from_string("cap:ext=?")
 
@@ -888,7 +955,8 @@ def test_question_mark_in_instance():
     assert instance.conforms_to(pattern_missing), "ext=? should match (no ext)"
 
 
-def test_must_not_have_pattern_requires_absent():
+# TEST0071: Must not have pattern requires absent
+def test_0071_must_not_have_pattern_requires_absent():
     # Pattern with K=! requires instance to NOT have K
     pattern = TaggedUrn.from_string("cap:ext=!")
 
@@ -903,7 +971,8 @@ def test_must_not_have_pattern_requires_absent():
     assert instance_must_not.conforms_to(pattern), "ext=! should match ext=!"
 
 
-def test_must_not_have_in_instance():
+# TEST0072: Must not have in instance
+def test_0072_must_not_have_in_instance():
     # Instance with K=! conflicts with patterns requiring K
     instance = TaggedUrn.from_string("cap:ext=!")
 
@@ -920,7 +989,8 @@ def test_must_not_have_in_instance():
     assert instance.conforms_to(pattern_missing), "ext=! should match (no ext)"
 
 
-def test_full_cross_product_matching():
+# TEST0073: Full cross product matching
+def test_0073_full_cross_product_matching():
     # Comprehensive test of all instance/pattern combinations
     # Based on the truth table in the plan
 
@@ -967,7 +1037,8 @@ def test_full_cross_product_matching():
     check("cap:k=v", "cap:k=w", False, "K=v/K=w")
 
 
-def test_mixed_special_values():
+# TEST0074: Mixed special values
+def test_0074_mixed_special_values():
     # Test URNs with multiple special values
     pattern = TaggedUrn.from_string("cap:required;optional=?;forbidden=!;exact=pdf")
 
@@ -988,7 +1059,8 @@ def test_mixed_special_values():
     assert not wrong_exact.conforms_to(pattern)
 
 
-def test_serialization_round_trip_special_values():
+# TEST0075: Serialization round trip special values
+def test_0075_serialization_round_trip_special_values():
     # All special values round-trip correctly
     originals = [
         "cap:ext=?",
@@ -1004,7 +1076,8 @@ def test_serialization_round_trip_special_values():
         assert urn == reparsed, f"Round-trip failed for: {original}"
 
 
-def test_compatibility_with_special_values():
+# TEST0076: Compatibility with special values
+def test_0076_compatibility_with_special_values():
     # TEST576: Test bidirectional accepts with special values
     must_not = TaggedUrn.from_string("cap:ext=!")
     must_have = TaggedUrn.from_string("cap:ext=*")
@@ -1049,7 +1122,8 @@ def test_compatibility_with_special_values():
     assert unspecified.accepts(missing)
 
 
-def test_specificity_with_special_values():
+# TEST0077: Specificity with special values
+def test_0077_specificity_with_special_values():
     # Six-form ladder: ?x=0, x?=v=1, x=*=2, x!=v=3, x=v=4, !x=5.
     exact = TaggedUrn.from_string("cap:a=x;b=y;c=z")          # 3 * 4 = 12
     must_have = TaggedUrn.from_string("cap:a;b;c")            # 3 * 2 = 6
