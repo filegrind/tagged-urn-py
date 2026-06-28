@@ -1181,7 +1181,7 @@ def test_580_comparable_specialization_chain():
 # TEST581: Incomparable URNs in different branches of the lattice
 def test_581_incomparable_different_branches():
     pdf = TaggedUrn.from_string("media:pdf")
-    txt = TaggedUrn.from_string("media:txt;textable")
+    txt = TaggedUrn.from_string("media:enc=utf-8;txt")
     # pdf.accepts(txt) = False (pdf missing from txt)
     # txt.accepts(pdf) = False (txt missing from pdf)
     # OR → False
@@ -1233,7 +1233,7 @@ def test_585_string_variants():
     assert urn.is_equivalent_str("media:pdf")  # same tags
     assert not urn.is_equivalent_str("media:")  # different
     assert urn.is_comparable_str("media:")  # on same chain
-    assert not urn.is_comparable_str("media:txt;textable")  # different branch
+    assert not urn.is_comparable_str("media:enc=utf-8;txt")  # different branch
 
 
 # TEST586: Special values (*, !, ?) with is_equivalent and is_comparable
